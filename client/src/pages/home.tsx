@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Sphere, MeshDistortMaterial, Float, Stars, Torus, Box, Cylinder, Ring } from "@react-three/drei";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
@@ -9,18 +9,48 @@ import { Shield, Lock, Eye, FileText, Activity, Zap, Brain, Server, Globe, GitBr
 // 3D HERO SCENE
 // ──────────────────────────────────────────────
 
-function NeuralNode({ position, size = 0.08, delay = 0 }: { position: [number, number, number]; size?: number; delay?: number }) {
+function NeuralNode({ position, size = 0.08, delay = 0, index = 0 }: { position: [number, number, number]; size?: number; delay?: number; index?: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
+
   useFrame((state) => {
-    if (!meshRef.current) return;
-    meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 0.8 + delay) * 0.15;
-    const s = 1 + Math.sin(state.clock.elapsedTime * 1.2 + delay) * 0.1;
-    meshRef.current.scale.set(s, s, s);
+    if (!meshRef.current || !matRef.current) return;
+    
+    const vh = window.innerHeight;
+    const scroll = window.scrollY;
+    
+    const progress = Math.max(0, Math.min(scroll / vh, 1));
+    const fadeOutProgress = Math.max(0, Math.min((scroll - vh) / vh, 1));
+    
+    const time = state.clock.elapsedTime;
+    const baseY = position[1] + Math.sin(time * 0.8 + delay) * 0.15;
+    
+    const dirX = position[0] === 0 ? (index % 2 === 0 ? 1 : -1) : Math.sign(position[0]);
+    const targetX = position[0] + dirX * 3.5; 
+    const targetY = baseY + Math.sin(index) * 2;
+    const targetZ = position[2] + 4.5;
+    
+    meshRef.current.position.set(
+      THREE.MathUtils.lerp(position[0], targetX, progress),
+      THREE.MathUtils.lerp(baseY, targetY, progress),
+      THREE.MathUtils.lerp(position[2], targetZ, progress)
+    );
+
+    const baseScale = 1 + Math.sin(time * 1.2 + delay) * 0.1;
+    const currentScale = THREE.MathUtils.lerp(baseScale, baseScale * 4, progress);
+    meshRef.current.scale.set(currentScale, currentScale, currentScale);
+    
+    const currentOpacity = THREE.MathUtils.lerp(0.3, 0.7, progress) * (1 - fadeOutProgress);
+    matRef.current.opacity = currentOpacity;
+    
+    meshRef.current.rotation.x = time * (1 + progress * 2);
+    meshRef.current.rotation.y = time * (1 + progress * 2);
   });
+
   return (
     <mesh ref={meshRef} position={position}>
       <sphereGeometry args={[size, 16, 16]} />
-      <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.8} transparent opacity={0.9} />
+      <meshStandardMaterial ref={matRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} transparent opacity={0.3} />
     </mesh>
   );
 }
@@ -32,13 +62,20 @@ function ConnectionLine({ start, end }: { start: [number, number, number]; end: 
   
   useFrame((state) => {
     if (!lineRef.current) return;
+    const vh = window.innerHeight;
+    const scroll = window.scrollY;
+    
+    const progress = Math.max(0, Math.min(scroll / (vh * 0.4), 1));
+    const baseOpacity = 0.15 + Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+    
     const mat = lineRef.current.material as THREE.LineBasicMaterial;
-    mat.opacity = 0.2 + Math.sin(state.clock.elapsedTime * 1.5) * 0.15;
+    mat.opacity = baseOpacity * (1 - progress);
   });
 
   return (
+    // @ts-expect-error - React types conflict with ThreeJS line element
     <line ref={lineRef as any} geometry={geometry}>
-      <lineBasicMaterial color="#ffffff" transparent opacity={0.25} linewidth={1} />
+      <lineBasicMaterial color="#ffffff" transparent opacity={0.15} linewidth={1} />
     </line>
   );
 }
@@ -74,7 +111,7 @@ function HeroScene() {
   return (
     <group ref={groupRef}>
       {nodes.map((pos, i) => (
-        <NeuralNode key={i} position={pos} size={i === 0 ? 0.14 : 0.07 + Math.random() * 0.04} delay={i * 0.5} />
+        <NeuralNode key={i} index={i} position={pos} size={i === 0 ? 0.14 : 0.07 + Math.random() * 0.04} delay={i * 0.5} />
       ))}
       {connections.map(([s, e], i) => (
         <ConnectionLine key={i} start={s} end={e} />
@@ -254,21 +291,13 @@ function HeroSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden" style={{ background: "#080808" }}>
-      <div className="absolute inset-0 grid-pattern opacity-50" />
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden" style={{ background: "transparent" }}>
+      <div className="absolute inset-0 grid-pattern opacity-50 z-0" />
       
       {/* Glow orbs */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full pulse-glow pointer-events-none"
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full pulse-glow pointer-events-none z-0"
         style={{ background: "radial-gradient(ellipse, rgba(255,255,255,0.06) 0%, transparent 70%)", filter: "blur(40px)" }} />
       
-      {/* 3D Canvas */}
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
-        <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
-          <HeroScene />
-          <Stars radius={100} depth={50} count={600} factor={2} saturation={0} fade speed={0.3} />
-        </Canvas>
-      </div>
-
       {/* Content */}
       <motion.div style={{ y, opacity, zIndex: 10 }} className="relative text-center px-6 max-w-5xl mx-auto">
         <motion.div
@@ -374,10 +403,11 @@ function ProblemSection() {
   ];
 
   return (
-    <section className="relative py-40 overflow-hidden" style={{ background: "#060606" }}>
-      <div className="absolute inset-0 dot-pattern opacity-30" />
+    <section className="relative py-40 overflow-hidden" style={{ background: "transparent" }}>
+      <div className="absolute inset-0 dot-pattern opacity-30 z-0" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#060606] opacity-80" style={{ zIndex: -1 }} />
 
-      <div className="max-w-7xl mx-auto px-6 relative">
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
         <RevealSection className="text-center mb-20">
           <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs text-white/50 uppercase tracking-widest"
             style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -692,56 +722,126 @@ function AgenticSection() {
   );
 }
 
+function Tendril({ index }: { index: number }) {
+  const lineRef = useRef<THREE.Line>(null);
+  const tipRef = useRef<THREE.Mesh>(null);
+  
+  const { geometry, lastPoint, randomOffset } = useMemo(() => {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * 3 + 0.5;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const y = Math.random() * 3 + 1.5; // Top y
+    
+    const points = [];
+    const numPoints = 20;
+    
+    const startY = -4;
+    
+    // Add some curve variation
+    const midXOffset = (Math.random() - 0.5) * 2;
+    const midZOffset = (Math.random() - 0.5) * 2;
+    
+    for (let j = 0; j <= numPoints; j++) {
+      const t = j / numPoints;
+      // Custom ease out curve
+      const spread = 1 - Math.pow(1 - t, 4);
+      
+      const px = x * spread + Math.sin(t * Math.PI) * midXOffset;
+      const py = startY + (y - startY) * t;
+      const pz = z * spread + Math.sin(t * Math.PI) * midZOffset;
+      
+      points.push(new THREE.Vector3(px, py, pz));
+    }
+    
+    const curve = new THREE.CatmullRomCurve3(points);
+    const pts = curve.getPoints(50);
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    
+    const colorArray = [];
+    for(let i = 0; i <= 50; i++) {
+       const t = i / 50;
+       const c = new THREE.Color();
+       c.lerpColors(new THREE.Color("#0a38ff"), new THREE.Color("#ff1a55"), t);
+       colorArray.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colorArray), 3));
+    
+    return { 
+      geometry: geo,
+      lastPoint: pts[50],
+      randomOffset: Math.random() * Math.PI * 2
+    };
+  }, []);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (lineRef.current) {
+      lineRef.current.rotation.y = Math.sin(t * 0.2 + randomOffset) * 0.1;
+    }
+    if (tipRef.current) {
+      const s = 1 + Math.sin(t * 3 + randomOffset) * 0.4;
+      tipRef.current.scale.set(s, s, s);
+    }
+  });
+
+  return (
+    // @ts-expect-error - React types conflict with ThreeJS line element
+    <line ref={lineRef as any} geometry={geometry}>
+      <lineBasicMaterial vertexColors transparent opacity={0.6} />
+      <mesh ref={tipRef} position={[lastPoint.x, lastPoint.y, lastPoint.z]}>
+        <sphereGeometry args={[0.04, 8, 8]} />
+        <meshBasicMaterial color="#ffc2d1" />
+      </mesh>
+    </line>
+  );
+}
+
+function FloatingParticle() {
+  const ref = useRef<THREE.Mesh>(null);
+  const initialPos = useMemo(() => new THREE.Vector3(
+    (Math.random() - 0.5) * 10, 
+    Math.random() * 10 - 5, 
+    (Math.random() - 0.5) * 10
+  ), []);
+  const speed = useMemo(() => Math.random() * 0.5 + 0.2, []);
+  const isPink = useMemo(() => Math.random() > 0.5, []);
+  const offset = useMemo(() => Math.random() * Math.PI * 2, []);
+  
+  useFrame((state) => {
+    if (!ref.current) return;
+    const t = state.clock.elapsedTime;
+    ref.current.position.y = initialPos.y + Math.sin(t * speed + offset) * 0.5;
+    ref.current.position.x = initialPos.x + Math.cos(t * speed * 0.5 + offset) * 0.2;
+  });
+
+  return (
+    <mesh ref={ref} position={initialPos}>
+      <sphereGeometry args={[Math.random() * 0.03 + 0.01, 8, 8]} />
+      <meshBasicMaterial color={isPink ? "#ff1a55" : "#ffffff"} transparent opacity={0.5} />
+    </mesh>
+  );
+}
+
 function AgentNetworkScene() {
   const groupRef = useRef<THREE.Group>(null);
   const { mouse } = useThree();
 
   useFrame((state) => {
     if (!groupRef.current) return;
-    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, mouse.x * 0.5 + state.clock.elapsedTime * 0.1, 0.05);
-    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, mouse.y * -0.3, 0.05);
+    // Rotate based on mouse
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, mouse.x * 0.4 + state.clock.elapsedTime * 0.05, 0.05);
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, mouse.y * -0.2 + 0.2, 0.05);
   });
 
-  const agents = [
-    { pos: [0, 0, 0] as [number, number, number], size: 0.3, label: "Xmem" },
-    { pos: [2.5, 1, 0] as [number, number, number], size: 0.18 },
-    { pos: [-2.5, 1, 0] as [number, number, number], size: 0.18 },
-    { pos: [2, -1.5, 0.5] as [number, number, number], size: 0.16 },
-    { pos: [-2, -1.5, 0.5] as [number, number, number], size: 0.16 },
-    { pos: [0, 2.5, -0.5] as [number, number, number], size: 0.16 },
-    { pos: [3, -0.5, -1] as [number, number, number], size: 0.12 },
-    { pos: [-3, -0.5, -1] as [number, number, number], size: 0.12 },
-  ];
-
   return (
-    <group ref={groupRef}>
-      {agents.map((agent, i) => (
-        <Float key={i} speed={1.5 + i * 0.2} rotationIntensity={0.1} floatIntensity={0.3}>
-          <mesh position={agent.pos}>
-            <icosahedronGeometry args={[agent.size, 1]} />
-            <meshStandardMaterial
-              color={i === 0 ? "#ffffff" : "#aaaaaa"}
-              emissive={i === 0 ? "#ffffff" : "#555555"}
-              emissiveIntensity={i === 0 ? 0.5 : 0.2}
-              metalness={0.8}
-              roughness={0.2}
-              wireframe={i !== 0}
-            />
-          </mesh>
-        </Float>
+    <group ref={groupRef} position={[0, -1, 0]}>
+      {Array.from({ length: 90 }).map((_, i) => (
+        <Tendril key={i} index={i} />
       ))}
-      {agents.slice(1).map((agent, i) => {
-        const pts = [new THREE.Vector3(...agents[0].pos), new THREE.Vector3(...agent.pos)];
-        const geo = new THREE.BufferGeometry().setFromPoints(pts);
-        return (
-          <line key={i} geometry={geo}>
-            <lineBasicMaterial color="#ffffff" transparent opacity={0.15} />
-          </line>
-        );
-      })}
-      <ambientLight intensity={0.3} />
-      <pointLight position={[3, 3, 3]} intensity={2} color="#ffffff" />
-      <pointLight position={[-3, -3, 3]} intensity={0.8} color="#666666" />
+      {Array.from({ length: 200 }).map((_, i) => (
+        <FloatingParticle key={`p-${i}`} />
+      ))}
     </group>
   );
 }
@@ -1183,20 +1283,46 @@ function Footer() {
 // ──────────────────────────────────────────────
 
 export default function Home() {
+  const [canvasOpacity, setCanvasOpacity] = useState(1);
+  
+  useEffect(() => {
+    const handleScroll = () => {
+      const vh = window.innerHeight;
+      const scroll = window.scrollY;
+      const opacity = Math.max(0, 1 - Math.max(0, scroll - vh * 1.5) / (vh * 0.5));
+      setCanvasOpacity(opacity);
+    };
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <div className="dark" style={{ background: "#080808", minHeight: "100vh" }}>
-      <Navbar />
-      <HeroSection />
-      <ProblemSection />
-      <SolutionSection />
-      <HowItWorksSection />
-      <AgenticSection />
-      <EnterpriseSection />
-      <DeveloperSection />
-      <UseCasesSection />
-      <VisionSection />
-      <CTASection />
-      <Footer />
+    <div className="dark relative" style={{ background: "#080808", minHeight: "100vh" }}>
+      <div 
+        className="fixed inset-0 pointer-events-none" 
+        style={{ zIndex: 0, opacity: canvasOpacity }}
+      >
+        <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
+          <HeroScene />
+          <Stars radius={100} depth={50} count={600} factor={2} saturation={0} fade speed={0.3} />
+        </Canvas>
+      </div>
+
+      <div className="relative z-10">
+        <Navbar />
+        <HeroSection />
+        <ProblemSection />
+        <SolutionSection />
+        <HowItWorksSection />
+        <AgenticSection />
+        <EnterpriseSection />
+        <DeveloperSection />
+        <UseCasesSection />
+        <VisionSection />
+        <CTASection />
+        <Footer />
+      </div>
     </div>
   );
 }
