@@ -10,6 +10,7 @@ import {
   Box,
   Cylinder,
   Ring,
+  Html,
 } from "@react-three/drei";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import * as THREE from "three";
@@ -915,6 +916,267 @@ function SolutionSection() {
               </motion.div>
             </RevealSection>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MemoryNode({ position, text, delay }: { position: THREE.Vector3; text: string; delay: number }) {
+  const [visible, setVisible] = useState(false);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    // Every 12 seconds, stay visible for 4 seconds
+    const cycle = (t + delay) % 12;
+    if (cycle < 4 && !visible) setVisible(true);
+    if (cycle >= 4 && visible) setVisible(false);
+  });
+
+  return (
+    <group position={position}>
+      <Html center zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+        <div
+          className={`transition-all duration-1000 ease-in-out ${
+            visible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95"
+          }`}
+        >
+          <div
+            className="px-3 py-2 rounded-lg text-xs whitespace-nowrap text-white"
+            style={{
+              background: "rgba(15, 23, 42, 0.7)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              border: "1px solid rgba(96, 165, 250, 0.3)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 0 16px rgba(96, 165, 250, 0.1)",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            <span className="text-blue-400 mr-2">{"->"}</span>
+            {text}
+          </div>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function NeuralBrain() {
+  const groupRef = useRef<THREE.Group>(null);
+  const linesMaterialRef = useRef<THREE.LineBasicMaterial>(null);
+  const { mouse } = useThree();
+
+  const { nodes, lineGeometry, memoryNodes } = useMemo(() => {
+    const pts = [];
+    // Reduced node count to 150 for a lighter, more scattered feel
+    for (let i = 0; i < 150; i++) {
+      // Create an oblong/ellipsoid shape
+      const theta = Math.random() * 2 * Math.PI;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      
+      // Push radius outwards so they aren't clustered in the middle
+      // Using Math.pow to weight points toward the outer shell
+      const r = (Math.pow(Math.random(), 0.5) * 1.5) + 0.5; 
+      
+      // Scaling factors to make it oblong: wider in Z (length), narrower in X (width)
+      let x = r * Math.sin(phi) * Math.cos(theta) * 0.8;
+      let y = r * Math.cos(phi) * 0.9;
+      let z = r * Math.sin(phi) * Math.sin(theta) * 1.4;
+
+      // Slight hemisphere split
+      if (x > 0) x += 0.1;
+      else x -= 0.1;
+
+      pts.push(new THREE.Vector3(x, y, z));
+    }
+
+    const linePositions = [];
+    const lineColors = [];
+    const color1 = new THREE.Color("#60a5fa"); // blue
+    const color2 = new THREE.Color("#c084fc"); // purple
+
+    for (let i = 0; i < pts.length; i++) {
+      let connections = 0;
+      for (let j = i + 1; j < pts.length; j++) {
+        if (connections > 3) break; // lower connections for a cleaner look
+        const dist = pts[i].distanceTo(pts[j]);
+        
+        // Prevent connections across the central fissure
+        const crossFissure = pts[i].x * pts[j].x < 0 && Math.abs(pts[i].x) < 0.2 && Math.abs(pts[j].x) < 0.2;
+
+        // Increase distance threshold since points are more scattered
+        if (dist < 1.2 && !crossFissure) {
+          linePositions.push(pts[i].x, pts[i].y, pts[i].z, pts[j].x, pts[j].y, pts[j].z);
+          const c = Math.random() > 0.5 ? color1 : color2;
+          lineColors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+          connections++;
+        }
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
+
+    // Define random memory strings
+    const memoryStrings = [
+      "my password was ***8",
+      "I went to wedding on 5th Jan",
+      "I love to code in react",
+      "Meeting with design team at 2pm",
+      "API key ends in 9xQ",
+      "User prefers dark mode",
+      "Deployed v2.0 on Tuesday",
+      "Favorite coffee is cold brew",
+    ];
+
+    // Pick random points that are spatially distributed to avoid overlap
+    const selectedPts: THREE.Vector3[] = [];
+    const shuffledPts = [...pts].sort(() => 0.5 - Math.random());
+    
+    for (const p of shuffledPts) {
+      let tooClose = false;
+      for (const sp of selectedPts) {
+        // Ensure popups are far enough from each other
+        if (p.distanceTo(sp) < 1.2) { 
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) {
+        selectedPts.push(p);
+      }
+      if (selectedPts.length >= memoryStrings.length) break;
+    }
+
+    // Fallback if not enough points meet the distance criteria
+    let fallbackIdx = 0;
+    while (selectedPts.length < memoryStrings.length) {
+      if (!selectedPts.includes(shuffledPts[fallbackIdx])) {
+        selectedPts.push(shuffledPts[fallbackIdx]);
+      }
+      fallbackIdx++;
+    }
+
+    const memNodes = memoryStrings.map((text, i) => ({
+      position: selectedPts[i],
+      text,
+      // Evenly distribute timing so they don't all pop up at once
+      delay: i * (12 / memoryStrings.length),
+    }));
+
+    return { nodes: pts, lineGeometry: geo, memoryNodes: memNodes };
+  }, []);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    const t = state.clock.elapsedTime;
+    
+    // Smooth tilt toward cursor direction
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(
+      groupRef.current.rotation.y,
+      mouse.x * 0.4 + t * 0.05,
+      0.05
+    );
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(
+      groupRef.current.rotation.x,
+      mouse.y * -0.3,
+      0.05
+    );
+    // Slight floating animation when idle
+    groupRef.current.position.y = Math.sin(t * 0.8) * 0.1;
+
+    // Neural pulses animate continuously
+    if (linesMaterialRef.current) {
+      linesMaterialRef.current.opacity = 0.15 + Math.sin(t * 4) * 0.15;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      {nodes.map((p, i) => (
+        <mesh key={i} position={p}>
+          <sphereGeometry args={[0.025 + Math.random() * 0.02, 8, 8]} />
+          <meshBasicMaterial 
+            color={i % 3 === 0 ? "#60a5fa" : (i % 3 === 1 ? "#c084fc" : "#ffffff")} 
+            transparent 
+            opacity={0.6 + Math.random() * 0.4} 
+          />
+        </mesh>
+      ))}
+      <lineSegments geometry={lineGeometry}>
+        <lineBasicMaterial ref={linesMaterialRef} vertexColors transparent opacity={0.3} />
+      </lineSegments>
+      {memoryNodes.map((mem, i) => (
+        <MemoryNode key={`mem-${i}`} position={mem.position} text={mem.text} delay={mem.delay} />
+      ))}
+    </group>
+  );
+}
+
+// ──────────────────────────────────────────────
+// SECOND BRAIN SECTION
+// ──────────────────────────────────────────────
+
+function SecondBrainSection() {
+  return (
+    <section className="relative py-40 overflow-hidden" style={{ background: "#060606" }}>
+      <div className="absolute inset-0 dot-pattern opacity-20" />
+      
+      {/* Background glow */}
+      <div
+        className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/4 w-[600px] h-[600px] pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(96,165,250,0.08) 0%, rgba(192,132,252,0.08) 30%, transparent 70%)",
+          filter: "blur(80px)",
+        }}
+      />
+
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          {/* Left: Content */}
+          <div>
+            <RevealSection>
+              <div
+                className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs text-white/50 uppercase tracking-widest"
+                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                Digital Cognition
+              </div>
+              <h2
+                className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                Xmem is your
+                <br />
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                  second brain.
+                </span>
+              </h2>
+              <div 
+                className="p-6 md:p-8 rounded-2xl mb-8 backdrop-blur-md"
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.4)"
+                }}
+              >
+                <p className="text-lg text-white/60 leading-relaxed">
+                  Xmem stores, organizes, and connects your memories, knowledge, and conversations so you never lose context.
+                </p>
+              </div>
+            </RevealSection>
+          </div>
+
+          {/* Right: 3D Brain */}
+          <RevealSection delay={0.3}>
+            <div className="h-[400px] md:h-[600px] w-full relative">
+              <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
+                <ambientLight intensity={0.5} />
+                <NeuralBrain />
+              </Canvas>
+            </div>
+          </RevealSection>
         </div>
       </div>
     </section>
@@ -2776,6 +3038,7 @@ export default function Home() {
         <HeroSection />
         <ProblemSection />
         <SolutionSection />
+        <SecondBrainSection />
         <BenchmarkSection />
         <SystemArchitectureSection />
         <HowItWorksSection />
