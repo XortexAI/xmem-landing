@@ -12,7 +12,7 @@ import {
   Ring,
   Html,
 } from "@react-three/drei";
-import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import { motion, useScroll, useTransform, useInView, AnimatePresence } from "framer-motion";
 import * as THREE from "three";
 import {
   Shield,
@@ -33,6 +33,13 @@ import {
   Network,
   Database,
   Layers,
+  MessageSquare,
+  Workflow,
+  Search,
+  Scale,
+  Wrench,
+  CheckCircle2,
+  ListPlus,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────
@@ -1423,510 +1430,291 @@ function BenchmarkSection() {
 // ARCHITECTURE SECTION
 // ──────────────────────────────────────────────
 
+function ArchStepCard({
+  step,
+  activeStep,
+}: {
+  step: { id: number; label: string; sub: string; color: string; icon: React.ElementType };
+  activeStep: number;
+}) {
+  const isActive = activeStep === step.id;
+  const isPast = activeStep > step.id;
+  const Icon = step.icon;
+
+  return (
+    <motion.div
+      className="relative flex flex-col items-center text-center gap-2.5 p-5 rounded-xl flex-shrink-0 w-36 backdrop-blur-sm"
+      style={{
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+      animate={{
+        scale: isActive ? 1.08 : isPast ? 1 : 0.96,
+        borderColor: isActive
+          ? step.color
+          : isPast
+            ? `${step.color}40`
+            : "rgba(255,255,255,0.06)",
+        boxShadow: isActive
+          ? `0 0 30px ${step.color}20, 0 0 60px ${step.color}08, inset 0 1px 0 ${step.color}15`
+          : "0 0 0 transparent",
+        opacity: isPast || isActive ? 1 : 0.3,
+      }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+    >
+      <div
+        className="w-10 h-10 rounded-lg flex items-center justify-center"
+        style={{
+          background: isActive || isPast ? `${step.color}10` : "rgba(255,255,255,0.02)",
+          border: `1px solid ${isActive || isPast ? `${step.color}20` : "rgba(255,255,255,0.04)"}`,
+        }}
+      >
+        <Icon
+          className="w-5 h-5 transition-colors duration-300"
+          style={{ color: isActive || isPast ? step.color : "rgba(255,255,255,0.12)" }}
+        />
+      </div>
+      <div>
+        <div className="text-white font-medium text-[13px] leading-tight">{step.label}</div>
+        <div className="text-white/20 text-[10px] mt-1 leading-tight">{step.sub}</div>
+      </div>
+      {isActive && (
+        <motion.div
+          className="absolute -inset-px rounded-xl pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 50% 0%, ${step.color}08 0%, transparent 70%)`,
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function ArchCurvedConnector({
+  fromId,
+  toColor,
+  activeStep,
+}: {
+  fromId: number;
+  toColor: string;
+  activeStep: number;
+}) {
+  const active = activeStep > fromId;
+  const pathD = "M 0 20 C 16 8, 40 32, 56 20";
+
+  return (
+    <div className="w-14 flex items-center justify-center flex-shrink-0">
+      <svg viewBox="0 0 56 40" className="w-full h-10 overflow-visible">
+        <path d={pathD} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1.5" strokeDasharray="4 4" />
+        <motion.path
+          d={pathD}
+          fill="none"
+          stroke={toColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: active ? 1 : 0, opacity: active ? 0.7 : 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          style={{ filter: `drop-shadow(0 0 6px ${toColor})` }}
+        />
+        {active && (
+          <circle r="2" fill="white" opacity="0.7" style={{ filter: `drop-shadow(0 0 3px ${toColor})` }}>
+            <animateMotion dur="2s" repeatCount="indefinite" path={pathD} />
+          </circle>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function ArchVerticalConnector({
+  fromId,
+  toColor,
+  activeStep,
+}: {
+  fromId: number;
+  toColor: string;
+  activeStep: number;
+}) {
+  const active = activeStep > fromId;
+  const pathD = "M 20 0 C 6 16, 34 28, 20 44";
+
+  return (
+    <div className="flex justify-center my-1">
+      <svg viewBox="0 0 40 44" className="w-10 h-11 overflow-visible">
+        <path d={pathD} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1.5" strokeDasharray="4 4" />
+        <motion.path
+          d={pathD}
+          fill="none"
+          stroke={toColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: active ? 1 : 0, opacity: active ? 0.7 : 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          style={{ filter: `drop-shadow(0 0 6px ${toColor})` }}
+        />
+        {active && (
+          <circle r="2" fill="white" opacity="0.7" style={{ filter: `drop-shadow(0 0 3px ${toColor})` }}>
+            <animateMotion dur="1.5s" repeatCount="indefinite" path={pathD} />
+          </circle>
+        )}
+      </svg>
+    </div>
+  );
+}
+
 function SystemArchitectureSection() {
-  const [activeStep, setActiveStep] = useState(0);
-  const totalSteps = 6;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start center", "end center"],
+  });
+
+  const [activeStep, setActiveStep] = useState(-1);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % totalSteps);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    const unsubscribe = scrollYProgress.on("change", (v: number) => {
+      if (v < 0.05) {
+        setActiveStep(-1);
+        return;
+      }
+      setActiveStep(Math.min(9, Math.floor(v * 11)));
+    });
+    return unsubscribe;
+  }, [scrollYProgress]);
 
   const steps = [
-    {
-      id: 0,
-      label: "Message In",
-      sub: "User msg + LLM response",
-      color: "#06b6d4",
-      icon: "💬",
-    },
-    {
-      id: 1,
-      label: "Classifier",
-      sub: "Routes to specialist agents",
-      color: "#3b82f6",
-      icon: "🔀",
-    },
-    {
-      id: 2,
-      label: "Extraction",
-      sub: "Agents pull facts (Profile, etc)",
-      color: "#8b5cf6",
-      icon: "🔍",
-    },
-    {
-      id: 3,
-      label: "Judge Agent",
-      sub: "Evaluates & formats facts",
-      color: "#f59e0b",
-      icon: "⚖️",
-    },
-    {
-      id: 4,
-      label: "Tool Call",
-      sub: "ADD / UPDATE / DELETE",
-      color: "#ef4444",
-      icon: "🔧",
-    },
-    {
-      id: 5,
-      label: "Knowledge Base",
-      sub: "Vector DB + Graph DB",
-      color: "#10b981",
-      icon: "🧠",
-    },
-  ];
-
-  const statusMessages = [
-    "Receiving raw message...",
-    "Classifying memory type...",
-    "Extracting relevant facts...",
-    "Validating extracted data...",
-    "Executing storage tools...",
-    "Memory permanently stored ✓",
+    { id: 0, label: "Message In", sub: "User msg + LLM response", color: "#06b6d4", icon: MessageSquare },
+    { id: 1, label: "Classifier", sub: "Routes to agents", color: "#3b82f6", icon: Workflow },
+    { id: 2, label: "Extraction", sub: "Pulls structured facts", color: "#8b5cf6", icon: Search },
+    { id: 3, label: "Judge Agent", sub: "Evaluates & formats", color: "#a855f7", icon: Scale },
+    { id: 4, label: "Tool Call", sub: "ADD / UPDATE / DELETE", color: "#ec4899", icon: Wrench },
+    { id: 5, label: "Knowledge Base", sub: "Vector + Graph DB", color: "#10b981", icon: Database },
+    { id: 6, label: "User Query", sub: "Natural language", color: "#14b8a6", icon: MessageSquare },
+    { id: 7, label: "Retrieval", sub: "Semantic + graph", color: "#22c55e", icon: Search },
+    { id: 8, label: "Context", sub: "Ranks & merges", color: "#84cc16", icon: ListPlus },
+    { id: 9, label: "Answer", sub: "Augmented response", color: "#eab308", icon: CheckCircle2 },
   ];
 
   return (
     <section
-      className="relative py-40 overflow-hidden"
-      style={{ background: "#080808" }}
+      ref={containerRef}
+      className="relative min-h-[250vh]"
+      style={{ background: "linear-gradient(180deg, #080808 0%, #060606 50%, #080808 100%)" }}
     >
-      <div className="absolute inset-0 grid-pattern opacity-10" />
-      <div className="max-w-7xl mx-auto px-6 relative">
-        <RevealSection className="text-center mb-20">
-          <div
-            className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs text-white/50 uppercase tracking-widest"
-            style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-          >
-            Architecture
-          </div>
-          <h2
-            className="text-5xl md:text-7xl font-bold text-white tracking-tight"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-          >
-            Engineered for <br />
-            <span className="gradient-text">Cognition</span>
-          </h2>
-          <p className="text-xl text-white/40 max-w-2xl mx-auto mt-6">
-            Watch how a single message flows through the Xmem pipeline — from
-            ingestion to permanent memory.
-          </p>
-        </RevealSection>
+      <div className="absolute inset-0 grid-pattern opacity-[0.03]" />
 
-        {/* Ingestion Pipeline */}
-        <RevealSection delay={0.1}>
-          <div
-            className="p-6 md:p-10 rounded-2xl relative overflow-hidden"
-            style={{
-              background: "rgba(255,255,255,0.015)",
-              border: "1px solid rgba(255,255,255,0.06)",
-            }}
-          >
-            {/* Live status bar */}
-            <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-3">
-                <Database className="w-5 h-5 text-cyan-400" /> Ingestion
-                Pipeline
-              </h3>
-              <motion.div
-                key={activeStep}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium"
-                style={{
-                  background: `${steps[activeStep].color}15`,
-                  border: `1px solid ${steps[activeStep].color}40`,
-                  color: steps[activeStep].color,
-                }}
-              >
-                <motion.div
-                  animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ repeat: Infinity, duration: 1 }}
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: steps[activeStep].color }}
-                />
-                {statusMessages[activeStep]}
-              </motion.div>
+      <div className="sticky top-0 h-screen flex flex-col items-center justify-center overflow-hidden">
+        <div className="max-w-5xl w-full mx-auto px-6">
+
+          <RevealSection className="text-center mb-14">
+            <div
+              className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-[11px] text-white/30 uppercase tracking-[0.2em]"
+              style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              Architecture
+            </div>
+            <h2
+              className="text-4xl md:text-5xl font-bold text-white tracking-tight mb-3"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              Engineered for <span className="gradient-text">Cognition</span>
+            </h2>
+            <p className="text-sm text-white/25 max-w-md mx-auto">
+              Scroll to trace how information flows through the system
+            </p>
+          </RevealSection>
+
+          {/* Ingestion Pipeline */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-1 h-4 rounded-full bg-cyan-500/30" />
+              <span className="text-[11px] font-medium text-white/25 uppercase tracking-[0.15em]">
+                Ingestion Pipeline
+              </span>
             </div>
 
-            {/* Row 1: Steps 0-2 (left to right) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-0 relative">
-              {steps.slice(0, 3).map((step, i) => (
-                <div
-                  key={i}
-                  className="flex flex-col md:flex-row items-center flex-1"
-                >
-                  <motion.div
-                    animate={{
-                      scale: activeStep === i ? 1.05 : 1,
-                      borderColor:
-                        activeStep === i
-                          ? step.color
-                          : "rgba(255,255,255,0.08)",
-                      boxShadow:
-                        activeStep === i ? `0 0 30px ${step.color}30` : "none",
-                    }}
-                    transition={{ duration: 0.5 }}
-                    className="relative w-full p-4 md:p-5 rounded-xl flex flex-col items-center text-center gap-2 z-10 cursor-default"
-                    style={{
-                      background:
-                        activeStep === i
-                          ? `${step.color}10`
-                          : "rgba(255,255,255,0.02)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                    }}
-                    onClick={() => setActiveStep(i)}
-                  >
-                    {activeStep === i && (
-                      <motion.div
-                        className="absolute inset-0 rounded-xl pointer-events-none"
-                        animate={{ opacity: [0.6, 0.2, 0.6] }}
-                        transition={{ repeat: Infinity, duration: 2 }}
-                        style={{
-                          border: `2px solid ${step.color}`,
-                          boxShadow: `0 0 25px ${step.color}50`,
-                        }}
-                      />
-                    )}
-                    <div className="text-2xl">{step.icon}</div>
-                    <div className="text-white font-semibold text-xs">
-                      {step.label}
-                    </div>
-                    <div className="text-white/35 text-[10px] leading-tight">
-                      {step.sub}
-                    </div>
-                    <motion.div
-                      animate={{
-                        scale: activeStep >= i ? 1 : 0.5,
-                        background:
-                          activeStep >= i
-                            ? step.color
-                            : "rgba(255,255,255,0.1)",
-                      }}
-                      className="w-2 h-2 rounded-full mt-1"
-                    />
-                  </motion.div>
-                  {i < 2 && (
-                    <div className="relative flex items-center justify-center w-8 md:w-10 h-8 md:h-auto flex-shrink-0">
-                      <div className="hidden md:block w-full h-px bg-white/10" />
-                      <div className="md:hidden h-full w-px bg-white/10" />
-                      {activeStep === i && (
-                        <motion.div
-                          className="absolute w-2 h-2 rounded-full z-20"
-                          style={{
-                            background: step.color,
-                            boxShadow: `0 0 12px ${step.color}`,
-                          }}
-                          initial={{ x: -16, opacity: 0 }}
-                          animate={{ x: 16, opacity: [0, 1, 1, 0] }}
-                          transition={{
-                            duration: 1.5,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
+            <div className="flex items-center justify-center">
+              <ArchStepCard step={steps[0]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={0} toColor={steps[1].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[1]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={1} toColor={steps[2].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[2]} activeStep={activeStep} />
+            </div>
+
+            <ArchVerticalConnector fromId={2} toColor={steps[3].color} activeStep={activeStep} />
+
+            <div className="flex items-center justify-center">
+              <ArchStepCard step={steps[3]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={3} toColor={steps[4].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[4]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={4} toColor={steps[5].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[5]} activeStep={activeStep} />
+            </div>
+          </div>
+
+          {/* Pipeline separator */}
+          <div className="flex items-center justify-center gap-4 my-5">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <motion.div
+              className="w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
+              animate={{
+                borderColor: activeStep >= 6 ? "#14b8a6" : "rgba(255,255,255,0.06)",
+                boxShadow: activeStep >= 6 ? "0 0 16px rgba(20,184,166,0.15)" : "0 0 0 transparent",
+              }}
+            >
+              <ChevronRight
+                className="w-3 h-3 rotate-90 transition-colors duration-300"
+                style={{ color: activeStep >= 6 ? "#14b8a6" : "rgba(255,255,255,0.12)" }}
+              />
+            </motion.div>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+          </div>
+
+          {/* Retrieval Pipeline */}
+          <div>
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-1 h-4 rounded-full bg-emerald-500/30" />
+              <span className="text-[11px] font-medium text-white/25 uppercase tracking-[0.15em]">
+                Retrieval Pipeline
+              </span>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <ArchStepCard step={steps[6]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={6} toColor={steps[7].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[7]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={7} toColor={steps[8].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[8]} activeStep={activeStep} />
+              <ArchCurvedConnector fromId={8} toColor={steps[9].color} activeStep={activeStep} />
+              <ArchStepCard step={steps[9]} activeStep={activeStep} />
+            </div>
+          </div>
+
+          {/* Progress dots */}
+          <div className="mt-10 flex justify-center">
+            <div className="flex items-center gap-1.5">
+              {steps.map((s) => (
+                <motion.div
+                  key={s.id}
+                  className="w-1.5 h-1.5 rounded-full"
+                  animate={{
+                    backgroundColor: activeStep >= s.id ? s.color : "rgba(255,255,255,0.06)",
+                    scale: activeStep === s.id ? 1.6 : 1,
+                    boxShadow: activeStep === s.id ? `0 0 8px ${s.color}` : "0 0 0 transparent",
+                  }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
               ))}
             </div>
-
-            {/* U-turn connector */}
-            <div className="flex justify-end pr-8 md:pr-12 relative h-12">
-              <div className="w-px h-full bg-white/10 relative">
-                {activeStep === 2 && (
-                  <motion.div
-                    className="absolute w-2 h-2 rounded-full z-20 left-1/2 -translate-x-1/2"
-                    style={{
-                      background: steps[2].color,
-                      boxShadow: `0 0 12px ${steps[2].color}`,
-                    }}
-                    initial={{ top: 0, opacity: 0 }}
-                    animate={{ top: "100%", opacity: [0, 1, 1, 0] }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Row 2: Steps 3-5 (right to left) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-0 relative">
-              {[...steps.slice(3, 6)].reverse().map((step, ri) => {
-                const i = 5 - ri;
-                return (
-                  <div
-                    key={i}
-                    className="flex flex-col md:flex-row items-center flex-1"
-                  >
-                    {ri > 0 && (
-                      <div className="relative flex items-center justify-center w-8 md:w-10 h-8 md:h-auto flex-shrink-0">
-                        <div className="hidden md:block w-full h-px bg-white/10" />
-                        <div className="md:hidden h-full w-px bg-white/10" />
-                        {activeStep === i + 1 && i < 5 && (
-                          <motion.div
-                            className="absolute w-2 h-2 rounded-full z-20"
-                            style={{
-                              background: steps[i + 1].color,
-                              boxShadow: `0 0 12px ${steps[i + 1].color}`,
-                            }}
-                            initial={{ x: 16, opacity: 0 }}
-                            animate={{ x: -16, opacity: [0, 1, 1, 0] }}
-                            transition={{
-                              duration: 1.5,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <motion.div
-                      animate={{
-                        scale: activeStep === i ? 1.05 : 1,
-                        borderColor:
-                          activeStep === i
-                            ? step.color
-                            : "rgba(255,255,255,0.08)",
-                        boxShadow:
-                          activeStep === i
-                            ? `0 0 30px ${step.color}30`
-                            : "none",
-                      }}
-                      transition={{ duration: 0.5 }}
-                      className="relative w-full p-4 md:p-5 rounded-xl flex flex-col items-center text-center gap-2 z-10 cursor-default"
-                      style={{
-                        background:
-                          activeStep === i
-                            ? `${step.color}10`
-                            : "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                      }}
-                      onClick={() => setActiveStep(i)}
-                    >
-                      {activeStep === i && (
-                        <motion.div
-                          className="absolute inset-0 rounded-xl pointer-events-none"
-                          animate={{ opacity: [0.6, 0.2, 0.6] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                          style={{
-                            border: `2px solid ${step.color}`,
-                            boxShadow: `0 0 25px ${step.color}50`,
-                          }}
-                        />
-                      )}
-                      <div className="text-2xl">{step.icon}</div>
-                      <div className="text-white font-semibold text-xs">
-                        {step.label}
-                      </div>
-                      <div className="text-white/35 text-[10px] leading-tight">
-                        {step.sub}
-                      </div>
-                      <motion.div
-                        animate={{
-                          scale: activeStep >= i ? 1 : 0.5,
-                          background:
-                            activeStep >= i
-                              ? step.color
-                              : "rgba(255,255,255,0.1)",
-                        }}
-                        className="w-2 h-2 rounded-full mt-1"
-                      />
-                    </motion.div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Progress bar */}
-            <div className="mt-8 h-1 w-full bg-white/5 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full rounded-full"
-                animate={{ width: `${((activeStep + 1) / totalSteps) * 100}%` }}
-                transition={{ duration: 0.5 }}
-                style={{
-                  background: `linear-gradient(90deg, #06b6d4, ${steps[activeStep].color})`,
-                }}
-              />
-            </div>
           </div>
-        </RevealSection>
 
-        {/* Retrieval Pipeline */}
-        <RevealSection delay={0.3}>
-          {(() => {
-            const retSteps = [
-              {
-                label: "User Query",
-                icon: "❓",
-                color: "#10b981",
-                sub: "Natural language question",
-              },
-              {
-                label: "Retrieval",
-                icon: "⚡",
-                color: "#34d399",
-                sub: "Semantic + graph search",
-              },
-              {
-                label: "Context",
-                icon: "📋",
-                color: "#6ee7b7",
-                sub: "Ranks & merges memories",
-              },
-              {
-                label: "Answer",
-                icon: "✅",
-                color: "#a7f3d0",
-                sub: "Augmented LLM response",
-              },
-            ];
-            const retPhase = activeStep % 4; // reuse the interval
-            const retLabels = [
-              "Processing query...",
-              "Searching memories...",
-              "Assembling context...",
-              "Answer ready ✓",
-            ];
-
-            return (
-              <div
-                className="mt-8 p-6 md:p-10 rounded-2xl relative overflow-hidden flex flex-col items-center"
-                style={{
-                  background: "rgba(16,185,129,0.03)",
-                  border: "1px solid rgba(16,185,129,0.15)",
-                }}
-              >
-                <div className="flex items-center justify-between mb-8 w-full flex-wrap gap-4">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-3">
-                    <Brain className="w-5 h-5 text-emerald-400" /> Retrieval
-                    Pipeline
-                  </h3>
-                  <motion.div
-                    key={retPhase}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium"
-                    style={{
-                      background: `${retSteps[retPhase].color}15`,
-                      border: `1px solid ${retSteps[retPhase].color}40`,
-                      color: retSteps[retPhase].color,
-                    }}
-                  >
-                    <motion.div
-                      animate={{ opacity: [1, 0.3, 1] }}
-                      transition={{ repeat: Infinity, duration: 1 }}
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: retSteps[retPhase].color }}
-                    />
-                    {retLabels[retPhase]}
-                  </motion.div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-0 relative w-full">
-                  {retSteps.map((step, i) => (
-                    <div
-                      key={i}
-                      className="flex flex-col md:flex-row items-center flex-1"
-                    >
-                      <motion.div
-                        animate={{
-                          scale: retPhase === i ? 1.05 : 1,
-                          borderColor:
-                            retPhase === i
-                              ? step.color
-                              : "rgba(255,255,255,0.08)",
-                          boxShadow:
-                            retPhase === i
-                              ? `0 0 30px ${step.color}30`
-                              : "none",
-                        }}
-                        transition={{ duration: 0.5 }}
-                        className="relative w-full p-4 md:p-5 rounded-xl flex flex-col items-center text-center gap-2 z-10 cursor-default"
-                        style={{
-                          background:
-                            retPhase === i
-                              ? `${step.color}10`
-                              : "rgba(255,255,255,0.02)",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                        }}
-                      >
-                        {retPhase === i && (
-                          <motion.div
-                            className="absolute inset-0 rounded-xl pointer-events-none"
-                            animate={{ opacity: [0.6, 0.2, 0.6] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            style={{
-                              border: `2px solid ${step.color}`,
-                              boxShadow: `0 0 25px ${step.color}50`,
-                            }}
-                          />
-                        )}
-                        <div className="text-2xl">{step.icon}</div>
-                        <div className="text-white font-semibold text-xs">
-                          {step.label}
-                        </div>
-                        <div className="text-white/35 text-[10px] leading-tight">
-                          {step.sub}
-                        </div>
-                        <motion.div
-                          animate={{
-                            scale: retPhase >= i ? 1 : 0.5,
-                            background:
-                              retPhase >= i
-                                ? step.color
-                                : "rgba(255,255,255,0.1)",
-                          }}
-                          className="w-2 h-2 rounded-full mt-1"
-                        />
-                      </motion.div>
-
-                      {i < retSteps.length - 1 && (
-                        <div className="relative flex items-center justify-center w-8 md:w-10 h-8 md:h-auto flex-shrink-0">
-                          <div className="hidden md:block w-full h-px bg-emerald-500/20" />
-                          <div className="md:hidden h-full w-px bg-emerald-500/20" />
-                          {retPhase === i && (
-                            <motion.div
-                              className="absolute w-2 h-2 rounded-full z-20"
-                              style={{
-                                background: step.color,
-                                boxShadow: `0 0 12px ${step.color}`,
-                              }}
-                              initial={{ x: -16, opacity: 0 }}
-                              animate={{ x: 16, opacity: [0, 1, 1, 0] }}
-                              transition={{
-                                duration: 1.5,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              }}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-8 h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    animate={{ width: `${((retPhase + 1) / 4) * 100}%` }}
-                    transition={{ duration: 0.5 }}
-                    style={{
-                      background: `linear-gradient(90deg, #10b981, ${retSteps[retPhase].color})`,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-        </RevealSection>
+        </div>
       </div>
     </section>
   );
