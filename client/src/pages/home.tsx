@@ -17,6 +17,7 @@ import { UseCasesSection } from "../sections/UseCasesSection";
 import { VisionSection } from "../sections/VisionSection";
 import { CTASection } from "../sections/CTASection";
 import { Footer } from "../sections/Footer";
+import { BrainOverlay } from "../components/BrainOverlay";
 
 export default function Home() {
   const [canvasOpacity, setCanvasOpacity] = useState(1);
@@ -41,6 +42,8 @@ export default function Home() {
       className="dark relative"
       style={{ background: "#080808", minHeight: "100vh" }}
     >
+      <BrainOverlay />
+
       <div
         className="fixed inset-0 pointer-events-none"
         style={{ zIndex: 0, opacity: canvasOpacity }}
