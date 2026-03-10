@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
@@ -44,14 +45,14 @@ export function Navbar() {
           <button className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2">
             Log in
           </button>
-          <a
+          <Link
             href="/scanner"
             data-testid="button-get-started-nav"
             className="text-sm font-medium px-4 py-2 rounded-md transition-all duration-200"
             style={{ background: "white", color: "black" }}
           >
             Get Started
-          </a>
+          </Link>
         </div>
       </div>
     </motion.nav>

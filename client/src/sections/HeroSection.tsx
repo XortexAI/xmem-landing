@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ChevronRight, ArrowRight } from "lucide-react";
 
@@ -69,7 +70,7 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.7 }}
           className="flex flex-wrap items-center justify-center gap-4"
         >
-          <a
+          <Link
             href="/scanner"
             data-testid="button-start-building"
             className="flex items-center gap-2 px-8 py-4 rounded-md font-semibold text-black text-sm transition-all duration-200"
@@ -77,7 +78,7 @@ export function HeroSection() {
           >
             Start Building
             <ArrowRight className="w-4 h-4" />
-          </a>
+          </Link>
           <button
             data-testid="button-read-docs"
             className="flex items-center gap-2 px-8 py-4 rounded-md font-medium text-white/80 text-sm transition-all duration-200"
