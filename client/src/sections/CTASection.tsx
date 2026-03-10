@@ -43,14 +43,15 @@ export function CTASection() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
-            <button
+            <a
+              href="/scanner"
               data-testid="button-get-started-cta"
               className="flex items-center gap-2 px-10 py-5 rounded-md font-semibold text-black text-base transition-all duration-200"
               style={{ background: "white" }}
             >
               Get Started
               <ArrowRight className="w-5 h-5" />
-            </button>
+            </a>
             <button
               data-testid="button-early-access"
               className="flex items-center gap-2 px-10 py-5 rounded-md font-medium text-white text-base transition-all duration-200"

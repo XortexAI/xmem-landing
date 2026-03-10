@@ -69,14 +69,15 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.7 }}
           className="flex flex-wrap items-center justify-center gap-4"
         >
-          <button
+          <a
+            href="/scanner"
             data-testid="button-start-building"
             className="flex items-center gap-2 px-8 py-4 rounded-md font-semibold text-black text-sm transition-all duration-200"
             style={{ background: "white" }}
           >
             Start Building
             <ArrowRight className="w-4 h-4" />
-          </button>
+          </a>
           <button
             data-testid="button-read-docs"
             className="flex items-center gap-2 px-8 py-4 rounded-md font-medium text-white/80 text-sm transition-all duration-200"

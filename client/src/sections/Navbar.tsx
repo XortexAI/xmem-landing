@@ -44,13 +44,14 @@ export function Navbar() {
           <button className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2">
             Log in
           </button>
-          <button
+          <a
+            href="/scanner"
             data-testid="button-get-started-nav"
             className="text-sm font-medium px-4 py-2 rounded-md transition-all duration-200"
             style={{ background: "white", color: "black" }}
           >
             Get Started
-          </button>
+          </a>
         </div>
       </div>
     </motion.nav>
