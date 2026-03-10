@@ -397,13 +397,48 @@ export default function Scanner() {
           if (!line.trim()) continue;
           try {
             const chunk = JSON.parse(line);
-            if (chunk.type === "chunk" && chunk.text) {
+            
+            // Helper to recursively extract text from potentially raw Gemini/Langchain payloads
+            const extractText = (data: any): string => {
+              if (!data) return "";
+              
+              if (typeof data === "string") {
+                // Sometimes the string is literally a JSON payload
+                if (data.startsWith("{") && data.includes('"candidates"')) {
+                  try {
+                    const parsed = JSON.parse(data);
+                    if (parsed && parsed.candidates) {
+                      return extractText(parsed);
+                    }
+                  } catch {
+                    // Ignore parse errors, just return the string
+                  }
+                }
+                return data;
+              }
+              
+              if (typeof data === "object") {
+                if (data.candidates && Array.isArray(data.candidates)) {
+                  const parts = data.candidates[0]?.content?.parts || [];
+                  return parts.map((p: any) => p.text || "").join("");
+                }
+                if (data.text) {
+                  return extractText(data.text);
+                }
+              }
+              
+              return "";
+            };
+
+            const textToAdd = extractText(chunk.type === "chunk" ? chunk.text : chunk);
+
+            if (textToAdd) {
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 if (last.id === assistantId) {
                   return [
                     ...prev.slice(0, -1),
-                    { ...last, content: last.content + chunk.text },
+                    { ...last, content: last.content + textToAdd },
                   ];
                 }
                 return prev;
