@@ -29,7 +29,7 @@ export function Navbar() {
             className="h-8 w-auto invert"
           />
         </div>
-        <div className="hidden md:flex items-center gap-8">
+        {/* <div className="hidden md:flex items-center gap-8">
           {["Product", "Docs", "Enterprise", "Pricing"].map((item) => (
             <a
               key={item}
@@ -40,7 +40,7 @@ export function Navbar() {
               {item}
             </a>
           ))}
-        </div>
+        </div> */}
         <div className="flex items-center gap-3">
           <button className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2">
             Log in

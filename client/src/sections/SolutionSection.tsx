@@ -1,10 +1,17 @@
-import { motion } from "framer-motion";
+import { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { Canvas } from "@react-three/fiber";
 import { Database, Layers, Globe, Network, GitBranch } from "lucide-react";
 import { RevealSection } from "../components/shared/RevealSection";
 import { ArchitectureScene } from "../components/three-d/ArchitectureScene";
 
 export function SolutionSection() {
+  const headingRef = useRef<HTMLDivElement>(null);
+  const isHeadingInView = useInView(headingRef, {
+    once: false,
+    margin: "-15% 0px -20% 0px",
+  });
+
   const features = [
     {
       icon: Database,
@@ -53,25 +60,75 @@ export function SolutionSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
           <div>
             <RevealSection>
-              <div
-                className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs text-white/50 uppercase tracking-widest"
-                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-              >
-                The Solution
+              <div ref={headingRef}>
+                <motion.div
+                  initial={{ opacity: 0, y: 16, filter: "blur(10px)" }}
+                  animate={
+                    isHeadingInView
+                      ? { opacity: 1, y: 0, filter: "blur(0px)" }
+                      : { opacity: 0, y: 16, filter: "blur(10px)" }
+                  }
+                  transition={{ duration: 0.55, ease: [0.21, 0.47, 0.32, 0.98] }}
+                  className="mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs uppercase tracking-widest text-white/50"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  The Solution
+                </motion.div>
+                <h2
+                  className="mb-6 text-5xl font-bold tracking-tight text-white md:text-6xl"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 24, filter: "blur(18px)" }}
+                    animate={
+                      isHeadingInView
+                        ? { opacity: 1, y: 0, filter: "blur(0px)" }
+                        : { opacity: 0, y: 24, filter: "blur(18px)" }
+                    }
+                    transition={{
+                      duration: 0.7,
+                      delay: 0.06,
+                      ease: [0.21, 0.47, 0.32, 0.98],
+                    }}
+                  >
+                    Introducing
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 32, filter: "blur(22px)" }}
+                    animate={
+                      isHeadingInView
+                        ? { opacity: 1, y: 0, filter: "blur(0px)" }
+                        : { opacity: 0, y: 32, filter: "blur(22px)" }
+                    }
+                    transition={{
+                      duration: 0.8,
+                      delay: 0.18,
+                      ease: [0.21, 0.47, 0.32, 0.98],
+                    }}
+                    className="gradient-text"
+                  >
+                    Xmem
+                  </motion.div>
+                </h2>
+                <motion.p
+                  initial={{ opacity: 0, y: 18, filter: "blur(12px)" }}
+                  animate={
+                    isHeadingInView
+                      ? { opacity: 1, y: 0, filter: "blur(0px)" }
+                      : { opacity: 0, y: 18, filter: "blur(12px)" }
+                  }
+                  transition={{
+                    duration: 0.7,
+                    delay: 0.28,
+                    ease: [0.21, 0.47, 0.32, 0.98],
+                  }}
+                  className="mb-10 text-lg leading-relaxed text-white/40"
+                >
+                  The missing memory layer for autonomous AI. A persistent,
+                  structured, and portable memory fabric that lives between your
+                  agents and the world.
+                </motion.p>
               </div>
-              <h2
-                className="text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                Introducing
-                <br />
-                <span className="gradient-text">Xmem</span>
-              </h2>
-              <p className="text-white/40 text-lg leading-relaxed mb-10">
-                The missing memory layer for autonomous AI. A persistent,
-                structured, and portable memory fabric that lives between your
-                agents and the world.
-              </p>
 
               <div className="space-y-2">
                 {[
@@ -89,13 +146,15 @@ export function SolutionSection() {
                   <motion.div
                     key={i}
                     whileHover={{ x: 6 }}
-                    className={`flex items-center justify-between px-5 py-4 rounded-lg transition-all duration-200`}
+                    className={`flex items-center justify-between rounded-lg px-5 py-4 transition-all duration-200 ${
+                      item.highlight ? "feature-border-spin" : ""
+                    }`}
                     style={{
                       background: item.highlight
-                        ? "rgba(255,255,255,0.08)"
+                        ? "transparent"
                         : "rgba(255,255,255,0.02)",
                       border: item.highlight
-                        ? "1px solid rgba(255,255,255,0.2)"
+                        ? "1px solid transparent"
                         : "1px solid rgba(255,255,255,0.05)",
                     }}
                   >
@@ -130,19 +189,17 @@ export function SolutionSection() {
                 whileHover={{
                   y: -6,
                   boxShadow:
-                    "0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)",
+                    "0 24px 48px rgba(0,0,0,0.6), 0 0 34px rgba(88,120,255,0.16)",
                 }}
-                className="p-6 rounded-xl flex flex-col gap-4 h-full transition-all duration-300"
-                style={{
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                }}
+                className="feature-border-spin h-full rounded-xl transition-all duration-300"
               >
-                <f.icon className="w-5 h-5 text-white/60" />
-                <h3 className="font-semibold text-white text-sm">{f.title}</h3>
-                <p className="text-white/40 text-xs leading-relaxed">
-                  {f.desc}
-                </p>
+                <div className="flex h-full flex-col gap-4 rounded-xl p-6">
+                  <f.icon className="w-5 h-5 text-white/60" />
+                  <h3 className="font-semibold text-white text-sm">{f.title}</h3>
+                  <p className="text-white/40 text-xs leading-relaxed">
+                    {f.desc}
+                  </p>
+                </div>
               </motion.div>
             </RevealSection>
           ))}

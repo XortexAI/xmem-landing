@@ -92,7 +92,7 @@ export function HeroSection() {
           </button>
         </motion.div>
 
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 1.2 }}
@@ -116,7 +116,7 @@ export function HeroSection() {
               </div>
             </div>
           ))}
-        </motion.div>
+        </motion.div> */}
       </motion.div>
 
       <motion.div
