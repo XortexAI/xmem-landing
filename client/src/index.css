@@ -326,6 +326,51 @@
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
+@keyframes rotate-border {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.feature-border-spin {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+.feature-border-spin::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(84, 38, 255, 0) 0deg,
+    rgba(84, 38, 255, 0.95) 65deg,
+    rgba(68, 154, 255, 0.95) 160deg,
+    rgba(84, 38, 255, 0.18) 220deg,
+    rgba(84, 38, 255, 0) 360deg
+  );
+  animation: rotate-border 5s linear infinite;
+  transform-origin: center;
+}
+
+.feature-border-spin::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(0.75rem - 1px);
+  background: rgba(11, 11, 15, 0.96);
+  z-index: 0;
+}
+
+.feature-border-spin > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Grid pattern */
 .grid-pattern {
   background-image: 
