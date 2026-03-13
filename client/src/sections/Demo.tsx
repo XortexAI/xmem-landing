@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 
-const demoVideoSrc = "/Xmem%20(1).mp4";
+const demoVideoSrc = "/Xmem.mp4";
 
 export function DemoSection() {
   const sectionRef = useRef<HTMLElement>(null);
