@@ -30,8 +30,8 @@ const competitors = [
     labelClass: "text-purple-300",
   },
   {
-    key: "mem0",
-    label: "Mem0",
+    key: "backboard",
+    label: "Backboard",
     gradient: "linear-gradient(135deg, #fbbf24, #f59e0b)",
     glow: "rgba(251,191,36,0.4)",
     textClass: "text-amber-200",
@@ -63,7 +63,7 @@ interface BenchmarkData {
   xmem: number;
   zep: number;
   full: number;
-  mem0: number;
+  backboard: number;
   memobase: number;
   supermemory: number;
 }
@@ -74,54 +74,54 @@ const longMemEvalData: BenchmarkData[] = [
     xmem: 97.1,
     zep: 92.9,
     full: 81.4,
-    mem0: 74.2,
+    backboard: 97.1,
     memobase: 68.5,
-    supermemory: 71.8,
+    supermemory: 97.1,
   },
   {
     label: "Single-Session\nAssistant",
-    xmem: 96.4,
+    xmem: 90.0,
     zep: 80.4,
     full: 94.6,
-    mem0: 72.1,
+    backboard: 98.2,
     memobase: 65.3,
-    supermemory: 69.7,
+    supermemory: 96.4,
   },
   {
     label: "Single-Session\nPreference",
-    xmem: 70.0,
+    xmem: 100.0,
     zep: 56.7,
     full: 20.0,
-    mem0: 42.3,
+    backboard: 90.0,
     memobase: 38.1,
-    supermemory: 45.6,
+    supermemory: 70,
   },
   {
     label: "Knowledge\nUpdate",
     xmem: 88.4,
     zep: 83.3,
     full: 78.2,
-    mem0: 62.8,
+    backboard: 93.6,
     memobase: 58.4,
-    supermemory: 60.1,
+    supermemory: 88.4,
   },
   {
     label: "Temporal\nReasoning",
-    xmem: 76.7,
+    xmem: 100.0,
     zep: 62.4,
     full: 45.1,
-    mem0: 48.9,
+    backboard: 91.7,
     memobase: 42.7,
-    supermemory: 51.3,
+    supermemory: 76.7,
   },
   {
     label: "Multi-Session",
-    xmem: 71.4,
+    xmem: 100.0,
     zep: 57.9,
     full: 44.3,
-    mem0: 39.5,
+    backboard: 91.7,
     memobase: 35.2,
-    supermemory: 41.8,
+    supermemory: 71.4,
   },
 ];
 
@@ -131,7 +131,7 @@ const locomoData: BenchmarkData[] = [
     xmem: 65.6,
     zep: 52.3,
     full: 58.1,
-    mem0: 45.7,
+    backboard: 45.7,
     memobase: 40.2,
     supermemory: 48.9,
   },
@@ -140,7 +140,7 @@ const locomoData: BenchmarkData[] = [
     xmem: 69.2,
     zep: 54.8,
     full: 61.5,
-    mem0: 43.1,
+    backboard: 43.1,
     memobase: 38.6,
     supermemory: 46.2,
   },
@@ -149,7 +149,7 @@ const locomoData: BenchmarkData[] = [
     xmem: 73.0,
     zep: 58.4,
     full: 49.7,
-    mem0: 51.2,
+    backboard: 51.2,
     memobase: 44.8,
     supermemory: 53.5,
   },
@@ -158,7 +158,7 @@ const locomoData: BenchmarkData[] = [
     xmem: 55.7,
     zep: 44.1,
     full: 52.3,
-    mem0: 38.6,
+    backboard: 38.6,
     memobase: 33.9,
     supermemory: 41.4,
   },
@@ -247,9 +247,12 @@ function BenchmarkChart({
               >
                 <div className="flex items-end justify-center gap-[2px] md:gap-[3px] w-full h-full">
                   {competitors.map((comp, ci) => {
-                    const value = item[
-                      comp.key as keyof BenchmarkData
-                    ] as number;
+                    const rawValue = item[comp.key as keyof BenchmarkData];
+                    const value =
+                      typeof rawValue === "number" &&
+                      Number.isFinite(rawValue)
+                        ? rawValue
+                        : 0;
                     return (
                       <div
                         key={comp.key}

@@ -6,6 +6,7 @@ import { Navbar } from "../sections/Navbar";
 import { HeroSection } from "../sections/HeroSection";
 import { ProblemSection } from "../sections/ProblemSection";
 import { SolutionSection } from "../sections/SolutionSection";
+import { DemoSection } from "../sections/Demo";
 import { SecondBrainSection } from "../sections/SecondBrainSection";
 import { BenchmarkSection } from "../sections/BenchmarkSection";
 import { SystemArchitectureSection } from "../sections/SystemArchitectureSection";
@@ -67,6 +68,7 @@ export default function Home() {
         <HeroSection />
         <ProblemSection />
         <SolutionSection />
+        <DemoSection />
         <SecondBrainSection />
         <BenchmarkSection />
         <SystemArchitectureSection />
