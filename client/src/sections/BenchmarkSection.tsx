@@ -1,9 +1,27 @@
 import { motion } from "framer-motion";
 import { RevealSection } from "../components/shared/RevealSection";
 
-const competitors = [
-  {
-    key: "xmem",
+type CompetitorKey =
+  | "xmem"
+  | "zep"
+  | "full"
+  | "backboard"
+  | "memobase"
+  | "supermemory"
+  | "mem0";
+
+type Competitor = {
+  key: CompetitorKey;
+  label: string;
+  gradient: string;
+  glow: string;
+  textClass: string;
+  dotGlow: string;
+  labelClass: string;
+};
+
+const competitorStyles: Record<CompetitorKey, Omit<Competitor, "key">> = {
+  xmem: {
     label: "Xmem",
     gradient: "linear-gradient(135deg, #00f5d4, #00bbf9)",
     glow: "rgba(0,245,212,0.6)",
@@ -11,8 +29,7 @@ const competitors = [
     dotGlow: "0 0 10px rgba(0,245,212,0.6)",
     labelClass: "text-cyan-300",
   },
-  {
-    key: "zep",
+  zep: {
     label: "Zep",
     gradient: "linear-gradient(135deg, #ff6b9d, #ff3366)",
     glow: "rgba(255,107,157,0.4)",
@@ -20,8 +37,7 @@ const competitors = [
     dotGlow: "0 0 10px rgba(255,107,157,0.4)",
     labelClass: "text-rose-300",
   },
-  {
-    key: "full",
+  full: {
     label: "Full context",
     gradient: "linear-gradient(135deg, #c084fc, #9333ea)",
     glow: "rgba(192,132,252,0.4)",
@@ -29,8 +45,7 @@ const competitors = [
     dotGlow: "0 0 10px rgba(192,132,252,0.4)",
     labelClass: "text-purple-300",
   },
-  {
-    key: "backboard",
+  backboard: {
     label: "Backboard",
     gradient: "linear-gradient(135deg, #fbbf24, #f59e0b)",
     glow: "rgba(251,191,36,0.4)",
@@ -38,8 +53,7 @@ const competitors = [
     dotGlow: "0 0 10px rgba(251,191,36,0.4)",
     labelClass: "text-amber-300",
   },
-  {
-    key: "memobase",
+  memobase: {
     label: "Memobase",
     gradient: "linear-gradient(135deg, #34d399, #10b981)",
     glow: "rgba(52,211,153,0.4)",
@@ -47,8 +61,7 @@ const competitors = [
     dotGlow: "0 0 10px rgba(52,211,153,0.4)",
     labelClass: "text-emerald-300",
   },
-  {
-    key: "supermemory",
+  supermemory: {
     label: "Supermemory",
     gradient: "linear-gradient(135deg, #60a5fa, #3b82f6)",
     glow: "rgba(96,165,250,0.4)",
@@ -56,9 +69,35 @@ const competitors = [
     dotGlow: "0 0 10px rgba(96,165,250,0.4)",
     labelClass: "text-blue-300",
   },
+  mem0: {
+    label: "Mem0",
+    gradient: "linear-gradient(135deg, #60a5fa, #3b82f6)",
+    glow: "rgba(96,165,250,0.4)",
+    textClass: "text-blue-200",
+    dotGlow: "0 0 10px rgba(96,165,250,0.4)",
+    labelClass: "text-blue-300",
+  },
+};
+
+const longMemEvalCompetitors: Competitor[] = [
+  { key: "xmem", ...competitorStyles.xmem },
+  { key: "zep", ...competitorStyles.zep },
+  { key: "full", ...competitorStyles.full },
+  { key: "backboard", ...competitorStyles.backboard },
+  { key: "memobase", ...competitorStyles.memobase },
+  { key: "supermemory", ...competitorStyles.supermemory },
 ];
 
-interface BenchmarkData {
+const locomoCompetitors: Competitor[] = [
+  { key: "xmem", ...competitorStyles.xmem },
+  { key: "zep", ...competitorStyles.zep },
+  { key: "full", ...competitorStyles.full },
+  { key: "backboard", ...competitorStyles.backboard },
+  { key: "memobase", ...competitorStyles.memobase },
+  { key: "mem0", ...competitorStyles.mem0 },
+];
+
+interface BenchmarkDataLongMem {
   label: string;
   xmem: number;
   zep: number;
@@ -68,7 +107,17 @@ interface BenchmarkData {
   supermemory: number;
 }
 
-const longMemEvalData: BenchmarkData[] = [
+interface BenchmarkDataLoCoMo {
+  label: string;
+  xmem: number;
+  zep: number;
+  full: number;
+  backboard: number;
+  memobase: number;
+  mem0: number;
+}
+
+const longMemEvalData: BenchmarkDataLongMem[] = [
   {
     label: "Single-Session\nUser (overall)",
     xmem: 97.1,
@@ -125,58 +174,59 @@ const longMemEvalData: BenchmarkData[] = [
   },
 ];
 
-const locomoData: BenchmarkData[] = [
+const locomoData: BenchmarkDataLoCoMo[] = [
   {
     label: "Single Hop",
-    xmem: 65.6,
-    zep: 52.3,
+    xmem: 90.6,
+    zep: 74.1,
     full: 58.1,
-    backboard: 45.7,
-    memobase: 40.2,
-    supermemory: 48.9,
+    backboard: 89.4,
+    memobase: 70.9,
+    mem0: 67.1,
   },
   {
     label: "Multi-Hop",
-    xmem: 69.2,
-    zep: 54.8,
+    xmem: 92.3,
+    zep: 66.0,
     full: 61.5,
-    backboard: 43.1,
-    memobase: 38.6,
-    supermemory: 46.2,
+    backboard: 75.0,
+    memobase: 46.9,
+    mem0: 51.1,
   },
   {
     label: "Temporal",
-    xmem: 73.0,
-    zep: 58.4,
+    xmem: 91.9,
+    zep: 79.8,
     full: 49.7,
-    backboard: 51.2,
-    memobase: 44.8,
-    supermemory: 53.5,
+    backboard: 91.9,
+    memobase: 85.0,
+    mem0: 55.5,
   },
   {
     label: "Open Domain",
-    xmem: 55.7,
-    zep: 44.1,
+    xmem: 91.2,
+    zep: 67.7,
     full: 52.3,
-    backboard: 38.6,
-    memobase: 33.9,
-    supermemory: 41.4,
+    backboard: 91.2,
+    memobase: 77.2,
+    mem0: 72.9,
   },
 ];
 
 function BenchmarkChart({
   data,
+  competitors,
   title,
   delay = 0,
 }: {
-  data: BenchmarkData[];
+  data: Array<Partial<Record<CompetitorKey, number>> & { label: string }>;
+  competitors: Competitor[];
   title: string;
   delay?: number;
 }) {
   return (
     <RevealSection delay={delay}>
       <div className="p-6 md:p-10 relative overflow-hidden">
-        {/* Title + Legend */}
         <div className="flex flex-col items-center gap-4 mb-8">
           <span
             className="text-white font-bold text-xl md:text-2xl"
@@ -187,9 +237,7 @@ function BenchmarkChart({
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             {competitors.map((c, idx) => (
               <div key={c.key} className="flex items-center gap-1.5">
-                {idx > 0 && (
-                  <span className="text-white/20 text-xs mr-1">·</span>
-                )}
+                {idx > 0 && <span className="text-white/20 text-xs mr-1">.</span>}
                 <div
                   className="w-3 h-3 rounded-[2px]"
                   style={{
@@ -205,9 +253,7 @@ function BenchmarkChart({
           </div>
         </div>
 
-        {/* Chart */}
         <div className="relative pl-10 md:pl-12">
-          {/* Y-axis labels */}
           <div
             className="absolute left-0 top-0 bottom-10 w-10 md:w-12 flex flex-col justify-between items-end pr-2 text-xs text-white/40 z-10"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -219,7 +265,6 @@ function BenchmarkChart({
             ))}
           </div>
 
-          {/* Grid lines */}
           <div className="absolute left-10 md:left-12 top-0 bottom-10 right-0 flex flex-col justify-between pointer-events-none">
             {[100, 80, 60, 40, 20, 0].map((v) => (
               <div
@@ -235,7 +280,6 @@ function BenchmarkChart({
             ))}
           </div>
 
-          {/* Bars */}
           <div
             className="flex items-end justify-around gap-1 md:gap-4"
             style={{ height: "340px" }}
@@ -247,12 +291,12 @@ function BenchmarkChart({
               >
                 <div className="flex items-end justify-center gap-[2px] md:gap-[3px] w-full h-full">
                   {competitors.map((comp, ci) => {
-                    const rawValue = item[comp.key as keyof BenchmarkData];
+                    const rawValue = item[comp.key];
                     const value =
-                      typeof rawValue === "number" &&
-                      Number.isFinite(rawValue)
+                      typeof rawValue === "number" && Number.isFinite(rawValue)
                         ? rawValue
                         : 0;
+
                     return (
                       <div
                         key={comp.key}
@@ -331,19 +375,18 @@ export function BenchmarkSection() {
           </p>
         </RevealSection>
 
-        {/* LongMemEval-S Chart */}
         <BenchmarkChart
           data={longMemEvalData}
+          competitors={longMemEvalCompetitors}
           title="LongMemEval-S Benchmark:"
           delay={0.2}
         />
 
-        {/* Spacer */}
         <div className="h-8 md:h-12" />
 
-        {/* LoCoMo Chart */}
         <BenchmarkChart
           data={locomoData}
+          competitors={locomoCompetitors}
           title="LoCoMo Benchmark:"
           delay={0.3}
         />
