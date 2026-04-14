@@ -17,7 +17,27 @@ interface RepoEntry {
   repo: string;
   phase1_status: string;
   phase2_status: string;
+  stats?: any;
+  phase2_stats?: any;
 }
+
+// Minimal markdown to render code blocks correctly and preserve spacing/indentation
+function renderMarkdown(text: string) {
+  if (!text) return null;
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('```') && part.endsWith('```')) {
+      const content = part.slice(3, -3).replace(/^[\w-]+\n/, ''); // remove language hint
+      return (
+        <pre key={index} className="bg-white/5 border border-white/10 rounded-md p-4 my-3 overflow-x-auto">
+          <code className="text-xs font-mono text-white/90 whitespace-pre">{content}</code>
+        </pre>
+      );
+    }
+    return <span key={index}>{part}</span>;
+  });
+}
+
 
 interface ChatMessage {
   id: string;
@@ -161,47 +181,39 @@ export default function Scanner() {
                     ...r,
                     phase1_status: data.phase1_status,
                     phase2_status: data.phase2_status,
+                    stats: data.stats,
+                    phase2_stats: data.phase2_stats,
                   }
                 : r,
             ),
           );
 
-          if (
-            data.phase1_status === "complete" &&
-            repo.phase1_status === "running"
-          ) {
-            setActiveRepo((prev) => {
-              if (prev?.org === repo.org && prev?.repo === repo.repo) {
-                return {
-                  ...prev,
-                  phase1_status: "complete",
-                  phase2_status: data.phase2_status,
-                };
-              }
-              return prev;
-            });
+          setActiveRepo((prev) => {
+            if (prev?.org === repo.org && prev?.repo === repo.repo) {
+              const updatedRepo = {
+                ...prev,
+                phase1_status: data.phase1_status,
+                phase2_status: data.phase2_status,
+                stats: data.stats,
+                phase2_stats: data.phase2_stats,
+              };
 
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `status-ready-${Date.now()}`,
-                role: "status",
-                content: `Phase 1 complete. ${repo.org}/${repo.repo} is now searchable. Ask anything about the codebase.`,
-              },
-            ]);
-          }
-
-          if (
-            data.phase2_status === "complete" &&
-            repo.phase2_status === "running"
-          ) {
-            setActiveRepo((prev) => {
-              if (prev?.org === repo.org && prev?.repo === repo.repo) {
-                return { ...prev, phase2_status: "complete" };
+              // Emulate initial "complete" message trigger
+              if (data.phase1_status === "complete" && prev.phase1_status === "running") {
+                setMessages((msgs) => [
+                  ...msgs,
+                  {
+                    id: `status-ready-${Date.now()}`,
+                    role: "status",
+                    content: `Phase 1 complete. ${repo.org}/${repo.repo} is now searchable. Ask anything about the codebase.`,
+                  },
+                ]);
               }
-              return prev;
-            });
-          }
+
+              return updatedRepo;
+            }
+            return prev;
+          });
         } catch {
           /* silently ignore polling errors */
         }
@@ -685,6 +697,38 @@ export default function Scanner() {
                 </p>
               </div>
             </div>
+          ) : !canChat && (activeRepo.phase1_status === "running" || activeRepo.phase1_status === "pending") ? (
+             <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
+               <Loader2 className="w-8 h-8 text-white/40 animate-spin mb-6" />
+               <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Indexing Repository</h2>
+               <p className="text-sm text-white/40 mb-10 max-w-md text-center leading-relaxed">
+                 Parsing ASTs, generating code embeddings, and extracting symbol definitions.
+               </p>
+               <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
+                 <div className="flex justify-between text-xs text-white/30 uppercase tracking-widest mb-6 pb-4 border-b border-white/5">
+                   <span>Progress Stats</span>
+                   <span>Phase 1</span>
+                 </div>
+                 <div className="space-y-5">
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Processed</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.files_processed || 0}</span>
+                   </div>
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Symbols Indexed</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.symbols_indexed || 0}</span>
+                   </div>
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Written</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.files_written || 0}</span>
+                   </div>
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Call Edges Created</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.call_edges_created || 0}</span>
+                   </div>
+                 </div>
+               </div>
+             </div>
           ) : (
             <>
               {/* Chat Header */}
@@ -745,8 +789,8 @@ export default function Scanner() {
                         {msg.content}
                       </div>
                     ) : (
-                      <div className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">
-                        {msg.content ||
+                      <div className="text-sm text-white/70 leading-relaxed font-sans whitespace-pre-wrap">
+                        {renderMarkdown(msg.content) ||
                           (chatLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin text-white/30" />
                           ) : null)}
