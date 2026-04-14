@@ -22,28 +22,11 @@ interface RepoEntry {
   phase2_stats?: any;
 }
 
-// Minimal markdown to render code blocks correctly and preserve spacing/indentation
-function renderMarkdown(text: string) {
-  if (!text) return null;
-  const parts = text.split(/(```[\s\S]*?```)/g);
-  return parts.map((part, index) => {
-    if (part.startsWith('```') && part.endsWith('```')) {
-      const content = part.slice(3, -3).replace(/^[\w-]+\n/, ''); // remove language hint
-      return (
-        <pre key={index} className="bg-white/5 border border-white/10 rounded-md p-4 my-3 overflow-x-auto">
-          <code className="text-xs font-mono text-white/90 whitespace-pre">{content}</code>
-        </pre>
-      );
-    }
-    return <span key={index}>{part}</span>;
-  });
-}
-
-
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "status";
   content: string;
+  toolCalls?: any[];
 }
 
 function StatusDot({ status }: { status: string }) {
@@ -158,6 +141,7 @@ export default function Scanner() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // ── Poll running scans ──────────────────────────────────────────────
@@ -258,6 +242,22 @@ export default function Scanner() {
     setRepos([]);
     setActiveRepo(null);
     setMessages([]);
+  };
+
+  const renderMarkdown = (text: string) => {
+    return text.split('```').map((part, index) => {
+      if (index % 2 === 1) {
+        const lines = part.split('\n');
+        const lang = lines.shift();
+        return (
+          <pre key={index} className="bg-black/30 p-4 rounded-lg my-3 overflow-x-auto border border-white/5 shadow-inner">
+            {lang && <div className="text-[10px] text-white/40 uppercase tracking-widest mb-2 select-none">{lang}</div>}
+            <code className="text-[13px] font-mono text-white/80 leading-relaxed font-light">{lines.join('\n')}</code>
+          </pre>
+        );
+      }
+      return <span key={index} dangerouslySetInnerHTML={{ __html: part.replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>').replace(/\n/g, '<br/>') }} />;
+    });
   };
 
   // ── Scan ─────────────────────────────────────────────────────────────
@@ -426,51 +426,35 @@ export default function Scanner() {
           try {
             const chunk = JSON.parse(line);
             
-            // Helper to recursively extract text from potentially raw Gemini/Langchain payloads
-            const extractText = (data: any): string => {
-              if (!data) return "";
-              
-              if (typeof data === "string") {
-                // Sometimes the string is literally a JSON payload
-                if (data.startsWith("{") && data.includes('"candidates"')) {
-                  try {
-                    const parsed = JSON.parse(data);
-                    if (parsed && parsed.candidates) {
-                      return extractText(parsed);
-                    }
-                  } catch {
-                    // Ignore parse errors, just return the string
+            if (chunk.type === "status") {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `status-${Date.now()}`,
+                  role: "status",
+                  content: chunk.content,
+                },
+              ]);
+            } else if (chunk.type === "tool_calls") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, toolCalls: chunk.tools } : m
+                )
+              );
+            } else if (chunk.type === "chunk") {
+              const textToAdd = chunk.text || "";
+              if (textToAdd) {
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last.id === assistantId) {
+                    return [
+                      ...prev.slice(0, -1),
+                      { ...last, content: last.content + textToAdd },
+                    ];
                   }
-                }
-                return data;
+                  return prev;
+                });
               }
-              
-              if (typeof data === "object") {
-                if (data.candidates && Array.isArray(data.candidates)) {
-                  const parts = data.candidates[0]?.content?.parts || [];
-                  return parts.map((p: any) => p.text || "").join("");
-                }
-                if (data.text) {
-                  return extractText(data.text);
-                }
-              }
-              
-              return "";
-            };
-
-            const textToAdd = extractText(chunk.type === "chunk" ? chunk.text : chunk);
-
-            if (textToAdd) {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last.id === assistantId) {
-                  return [
-                    ...prev.slice(0, -1),
-                    { ...last, content: last.content + textToAdd },
-                  ];
-                }
-                return prev;
-              });
             }
           } catch {
             /* skip malformed lines */
@@ -508,8 +492,8 @@ export default function Scanner() {
           id: `status-select-${Date.now()}`,
           role: "status",
           content: `Connected to ${repo.org}/${repo.repo}. Ask anything about the codebase.${
-            repo.phase2_status !== "complete"
-              ? " (AI summaries are still generating in the background)"
+            repo.phase2_status === "failed"
+              ? " (Warning: AI enrichment failed, falling back to AST summaries)"
               : ""
           }`,
         },
@@ -531,7 +515,9 @@ export default function Scanner() {
     return <UsernameScreen onSubmit={handleLogin} />;
   }
 
-  const canChat = activeRepo?.phase1_status === "complete";
+  const canChat = activeRepo?.phase1_status === "complete" && 
+                  activeRepo?.phase2_status !== "running" && 
+                  activeRepo?.phase2_status !== "pending";
 
   return (
     <div
@@ -738,7 +724,12 @@ export default function Scanner() {
                 </div>
               </div>
             </div>
-          ) : !canChat && (activeRepo.phase1_status === "running" || activeRepo.phase1_status === "pending" || activeRepo.phase2_status === "running" || activeRepo.phase2_status === "pending") ? (
+          ) : !canChat && (
+              activeRepo.phase1_status === "running" || 
+              activeRepo.phase1_status === "pending" || 
+              activeRepo.phase2_status === "running" || 
+              activeRepo.phase2_status === "pending"
+          ) ? (
              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
                <Loader2 className="w-8 h-8 text-white/40 animate-spin mb-6" />
                <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -786,6 +777,7 @@ export default function Scanner() {
                      <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.call_edges_created || 0}</span>
                    </div>
                  </div>
+               </div>
                ) : (
                  // PHASE 2 DASHBOARD
                  <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
@@ -831,72 +823,84 @@ export default function Scanner() {
           ) : (
             <>
               {/* Chat Header */}
-              <div
-                className="flex items-center justify-between px-6 py-3 flex-shrink-0"
-                style={{
-                  borderBottom: "1px solid rgba(255,255,255,0.06)",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-white/70">
-                    {activeRepo.org}/{activeRepo.repo}
-                  </span>
-                  <div
-                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
-                    style={{ background: "rgba(255,255,255,0.06)" }}
-                  >
-                    <StatusDot status={activeRepo.phase1_status} />
-                    <span className="text-white/40" style={{ fontSize: "10px" }}>
-                      {activeRepo.phase1_status === "complete"
-                        ? activeRepo.phase2_status === "complete"
-                          ? "Fully indexed"
-                          : "Searchable (enriching...)"
-                        : activeRepo.phase1_status === "running"
-                          ? "Scanning..."
-                          : activeRepo.phase1_status}
-                    </span>
+              <div className="border-b border-white/5 p-4 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-10 rounded-t-2xl">
+                <div>
+                  <h3 className="text-white font-medium flex items-center space-x-2" style={{ fontFamily: "'Inter', sans-serif" }}>
+                    <MessageSquare size={16} className="text-blue-400" />
+                    <span>XMem Knowledge Graph</span>
+                  </h3>
+                  <p className="text-xs text-white/40 mt-1">{activeRepo.org}/{activeRepo.repo}</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-white/40 uppercase tracking-widest font-medium">Debug Mode</span>
+                    <button 
+                      onClick={() => setDebugMode(!debugMode)}
+                      className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${debugMode ? 'bg-blue-500/80' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-300 ${debugMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
                   </div>
+                  <button
+                    onClick={() => setActiveRepo(null)}
+                    className="text-xs text-white/40 hover:text-white transition-colors uppercase tracking-widest"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`max-w-3xl ${msg.role === "user" ? "ml-auto" : ""}`}
-                  >
-                    {msg.role === "status" ? (
-                      <div
-                        className="flex items-start gap-2 px-3 py-2 rounded-lg"
-                        style={{
-                          background: "rgba(255,255,255,0.03)",
-                        }}
-                      >
-                        <Circle className="w-3 h-3 text-white/30 mt-0.5 flex-shrink-0" />
-                        <span className="text-xs text-white/40">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                {messages.map((msg) => {
+                  const isUser = msg.role === "user";
+                  
+                  if (msg.role === "status") {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-2">
+                        <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] text-white/30 uppercase tracking-widest">
                           {msg.content}
-                        </span>
+                        </div>
                       </div>
-                    ) : msg.role === "user" ? (
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex ${
+                        isUser ? "justify-end" : "justify-start"
+                      }`}
+                    >
                       <div
-                        className="inline-block px-4 py-2.5 rounded-xl text-sm text-white"
-                        style={{
-                          background: "rgba(255,255,255,0.08)",
-                        }}
+                        className={`max-w-[85%] rounded-2xl p-4 ${
+                          isUser
+                            ? "bg-gradient-to-br from-blue-600/20 to-blue-500/10 text-white/90 border border-blue-500/20"
+                            : "bg-white/5 text-white/80 border border-white/10"
+                        }`}
                       >
-                        {msg.content}
+                        <div className="text-sm font-light leading-relaxed">
+                          {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
+                        </div>
+                        
+                        {debugMode && msg.toolCalls && msg.toolCalls.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2">
+                             <span className="text-[10px] text-white/30 uppercase tracking-widest">Graph Tool Invocations ({msg.toolCalls.length})</span>
+                             {msg.toolCalls.map((tc, idx) => (
+                               <div key={idx} className="bg-black/40 rounded p-3 font-mono text-[11px] text-white/60 border border-white/5">
+                                 <span className="text-purple-400">{tc.name}</span>
+                                 <span className="text-white/30">(</span>
+                                 <span className="text-blue-300/80">{JSON.stringify(tc.args)}</span>
+                                 <span className="text-white/30">)</span>
+                               </div>
+                             ))}
+                          </div>
+                        )}
+
                       </div>
-                    ) : (
-                      <div className="text-sm text-white/70 leading-relaxed font-sans whitespace-pre-wrap">
-                        {renderMarkdown(msg.content) ||
-                          (chatLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-white/30" />
-                          ) : null)}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
                 <div ref={chatEndRef} />
               </div>
 
