@@ -6,12 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Scanner from "@/pages/scanner";
+import ContextImporter from "@/pages/context";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/scanner" component={Scanner} />
+      <Route path="/context" component={ContextImporter} />
       <Route component={NotFound} />
     </Switch>
   );
