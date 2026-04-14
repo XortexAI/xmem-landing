@@ -8,6 +8,7 @@ import {
   GitBranch,
   Lock,
   MessageSquare,
+  Search
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
@@ -152,6 +153,7 @@ export default function Scanner() {
 
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
+  const [repoSearch, setRepoSearch] = useState("");
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -222,6 +224,20 @@ export default function Scanner() {
 
     return () => clearInterval(interval);
   }, [repos, username]);
+
+  useEffect(() => {
+    if (!username) return;
+    const fetchRepos = async () => {
+      try {
+        const res = await fetch(`${API_URL}/v1/scanner/repos?username=${encodeURIComponent(username)}`);
+        const data = await res.json();
+        if (data.repos) {
+          setRepos(data.repos);
+        }
+      } catch {}
+    };
+    fetchRepos();
+  }, [username]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -682,29 +698,60 @@ export default function Scanner() {
         {/* ── Right Panel — Chat ──────────────────────────────────── */}
         <main className="flex-1 flex flex-col min-w-0">
           {!activeRepo ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center px-6">
-                <MessageSquare className="w-12 h-12 text-white/10 mx-auto mb-4" />
-                <h2
-                  className="text-lg font-semibold text-white/30"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  No repository selected
-                </h2>
-                <p className="text-sm text-white/15 mt-2 max-w-sm">
-                  Enter a GitHub URL on the left to scan a repository,
-                  then chat with it here.
-                </p>
+            <div className="flex-1 flex flex-col items-center p-8 bg-[#0A0A0A] overflow-y-auto custom-scrollbar">
+              <div className="w-full max-w-3xl mt-12 mb-8">
+                <h2 className="text-3xl text-white/90 font-medium mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Indexed Repositories</h2>
+                <p className="text-white/40 text-sm mb-8">Select a previously scanned repository from your catalog to start chatting immediately.</p>
+                
+                <div className="relative mb-6 leading-none">
+                  <Search className="w-5 h-5 text-white/30 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search your analyzed repositories..."
+                    value={repoSearch}
+                    onChange={(e) => setRepoSearch(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-white/20 transition-colors"
+                  />
+                </div>
+
+                <div className="grid gap-3">
+                  {repos.filter(r => r.repo.toLowerCase().includes(repoSearch.toLowerCase()) || r.org.toLowerCase().includes(repoSearch.toLowerCase())).map((repo) => (
+                    <div
+                      key={`${repo.org}/${repo.repo}`}
+                      onClick={() => { setActiveRepo(repo); setMessages([]); }}
+                      className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 rounded-xl cursor-pointer transition-all duration-300"
+                    >
+                      <div>
+                        <div className="text-white/90 font-medium flex items-center gap-2">
+                          <span className="text-white/30 font-normal">{repo.org}</span>
+                          <span className="text-white/30">/</span>
+                          <span className="">{repo.repo}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4 sm:mt-0">
+                         <span className={`text-[10px] px-3 py-1 uppercase tracking-wider rounded-full ${repo.phase1_status === 'complete' ? 'bg-[#ff3366]/10 text-[#ff3366]' : 'bg-yellow-500/10 text-yellow-500'}`}>P1: {repo.phase1_status}</span>
+                         <span className={`text-[10px] px-3 py-1 uppercase tracking-wider rounded-full ${repo.phase2_status === 'complete' ? 'bg-[#00f0ff]/10 text-[#00f0ff]' : 'bg-yellow-500/10 text-yellow-500'}`}>P2: {repo.phase2_status}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {repos.length === 0 && <div className="text-white/20 text-sm py-12 text-center rounded-xl bg-white/[0.01] border border-white/5 border-dashed">No repositories found. Paste a link on the left to scan one.</div>}
+                </div>
               </div>
             </div>
-          ) : !canChat && (activeRepo.phase1_status === "running" || activeRepo.phase1_status === "pending") ? (
+          ) : !canChat && (activeRepo.phase1_status === "running" || activeRepo.phase1_status === "pending" || activeRepo.phase2_status === "running" || activeRepo.phase2_status === "pending") ? (
              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
                <Loader2 className="w-8 h-8 text-white/40 animate-spin mb-6" />
-               <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Indexing Repository</h2>
+               <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                 {activeRepo.phase1_status !== "complete" ? "Indexing Repository" : "Enriching via LLM"}
+               </h2>
                <p className="text-sm text-white/40 mb-10 max-w-md text-center leading-relaxed">
-                 Parsing ASTs, generating code embeddings, and extracting symbol definitions.
+                 {activeRepo.phase1_status !== "complete" 
+                   ? "Parsing ASTs, generating code embeddings, and extracting symbol definitions." 
+                   : "Generating AI-powered summaries for all codebase files and symbols."}
                </p>
-               <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
+               
+               {activeRepo.phase1_status !== "complete" ? (
+                 <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
                  <div className="flex justify-between text-xs text-white/30 uppercase tracking-widest mb-6 pb-4 border-b border-white/5">
                    <span>Progress Stats</span>
                    <span>Phase 1</span>
@@ -739,7 +786,47 @@ export default function Scanner() {
                      <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.call_edges_created || 0}</span>
                    </div>
                  </div>
-               </div>
+               ) : (
+                 // PHASE 2 DASHBOARD
+                 <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
+                   <div className="flex justify-between text-xs text-white/30 uppercase tracking-widest mb-6 pb-4 border-b border-white/5">
+                     <span>Progress Stats</span>
+                     <span>Phase 2</span>
+                   </div>
+                   <div className="space-y-5">
+                     <div className="flex justify-between items-center group">
+                       <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Enriched</span>
+                       <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                         {activeRepo.phase2_stats?.files_enriched || 0}
+                         {activeRepo.phase2_stats?.total_files_to_enrich ? ` / ${activeRepo.phase2_stats.total_files_to_enrich}` : ''}
+                       </span>
+                     </div>
+                     {activeRepo.phase2_stats?.total_files_to_enrich && (
+                       <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                         <div 
+                           className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                           style={{ width: `${Math.min(100, Math.round(((activeRepo.phase2_stats?.files_enriched || 0) / activeRepo.phase2_stats.total_files_to_enrich) * 100))}%` }}
+                         />
+                       </div>
+                     )}
+                     <div className="flex justify-between items-center group">
+                       <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Symbols Enriched</span>
+                       <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                         {activeRepo.phase2_stats?.symbols_enriched || 0}
+                         {activeRepo.phase2_stats?.total_symbols_to_enrich ? ` / ${activeRepo.phase2_stats.total_symbols_to_enrich}` : ''}
+                       </span>
+                     </div>
+                     {activeRepo.phase2_stats?.total_symbols_to_enrich && (
+                       <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                         <div 
+                           className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                           style={{ width: `${Math.min(100, Math.round(((activeRepo.phase2_stats?.symbols_enriched || 0) / activeRepo.phase2_stats.total_symbols_to_enrich) * 100))}%` }}
+                         />
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
              </div>
           ) : (
             <>
