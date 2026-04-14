@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import Navbar from "@/sections/Navbar";
+import { Navbar } from "@/sections/Navbar";
 import { Brain, Link as LinkIcon, Download, User, Activity } from "lucide-react";
 
 export default function ContextImporter() {
