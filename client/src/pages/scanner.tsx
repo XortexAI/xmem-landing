@@ -712,8 +712,20 @@ export default function Scanner() {
                  <div className="space-y-5">
                    <div className="flex justify-between items-center group">
                      <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Processed</span>
-                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.files_processed || 0}</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                       {activeRepo.stats?.files_processed || 0}
+                       {activeRepo.stats?.total_files_to_process ? ` / ${activeRepo.stats.total_files_to_process}` : ''}
+                     </span>
                    </div>
+                   
+                   {activeRepo.stats?.total_files_to_process && (
+                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                       <div 
+                         className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                         style={{ width: `${Math.min(100, Math.round(((activeRepo.stats?.files_processed || 0) / activeRepo.stats.total_files_to_process) * 100))}%` }}
+                       />
+                     </div>
+                   )}
                    <div className="flex justify-between items-center group">
                      <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Symbols Indexed</span>
                      <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.symbols_indexed || 0}</span>
