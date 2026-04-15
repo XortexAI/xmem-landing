@@ -8,6 +8,7 @@ import {
   GitBranch,
   Lock,
   MessageSquare,
+  Search
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
@@ -17,6 +18,8 @@ interface RepoEntry {
   repo: string;
   phase1_status: string;
   phase2_status: string;
+  stats?: any;
+  phase2_stats?: any;
 }
 
 interface ScanEstimates {
@@ -34,6 +37,7 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "status";
   content: string;
+  toolCalls?: any[];
 }
 
 function StatusDot({ status }: { status: string }) {
@@ -144,10 +148,12 @@ export default function Scanner() {
 
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
+  const [repoSearch, setRepoSearch] = useState("");
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // ── Load persisted repos from API ─────────────────────────────────
@@ -204,47 +210,39 @@ export default function Scanner() {
                     ...r,
                     phase1_status: data.phase1_status,
                     phase2_status: data.phase2_status,
+                    stats: data.stats,
+                    phase2_stats: data.phase2_stats,
                   }
                 : r,
             ),
           );
 
-          if (
-            data.phase1_status === "complete" &&
-            repo.phase1_status === "running"
-          ) {
-            setActiveRepo((prev) => {
-              if (prev?.org === repo.org && prev?.repo === repo.repo) {
-                return {
-                  ...prev,
-                  phase1_status: "complete",
-                  phase2_status: data.phase2_status,
-                };
-              }
-              return prev;
-            });
+          setActiveRepo((prev) => {
+            if (prev?.org === repo.org && prev?.repo === repo.repo) {
+              const updatedRepo = {
+                ...prev,
+                phase1_status: data.phase1_status,
+                phase2_status: data.phase2_status,
+                stats: data.stats,
+                phase2_stats: data.phase2_stats,
+              };
 
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `status-ready-${Date.now()}`,
-                role: "status",
-                content: `Phase 1 complete. ${repo.org}/${repo.repo} is now searchable. Ask anything about the codebase.`,
-              },
-            ]);
-          }
-
-          if (
-            data.phase2_status === "complete" &&
-            repo.phase2_status === "running"
-          ) {
-            setActiveRepo((prev) => {
-              if (prev?.org === repo.org && prev?.repo === repo.repo) {
-                return { ...prev, phase2_status: "complete" };
+              // Emulate initial "complete" message trigger
+              if (data.phase1_status === "complete" && prev.phase1_status === "running") {
+                setMessages((msgs) => [
+                  ...msgs,
+                  {
+                    id: `status-ready-${Date.now()}`,
+                    role: "status",
+                    content: `Phase 1 complete. ${repo.org}/${repo.repo} is now searchable. Ask anything about the codebase.`,
+                  },
+                ]);
               }
-              return prev;
-            });
-          }
+
+              return updatedRepo;
+            }
+            return prev;
+          });
         } catch {
           /* silently ignore polling errors */
         }
@@ -253,6 +251,20 @@ export default function Scanner() {
 
     return () => clearInterval(interval);
   }, [repos, username]);
+
+  useEffect(() => {
+    if (!username) return;
+    const fetchRepos = async () => {
+      try {
+        const res = await fetch(`${API_URL}/v1/scanner/repos?username=${encodeURIComponent(username)}`);
+        const data = await res.json();
+        if (data.repos) {
+          setRepos(data.repos);
+        }
+      } catch {}
+    };
+    fetchRepos();
+  }, [username]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -273,6 +285,22 @@ export default function Scanner() {
     setRepos([]);
     setActiveRepo(null);
     setMessages([]);
+  };
+
+  const renderMarkdown = (text: string) => {
+    return text.split('```').map((part, index) => {
+      if (index % 2 === 1) {
+        const lines = part.split('\n');
+        const lang = lines.shift();
+        return (
+          <pre key={index} className="bg-black/30 p-4 rounded-lg my-3 overflow-x-auto border border-white/5 shadow-inner">
+            {lang && <div className="text-[10px] text-white/40 uppercase tracking-widest mb-2 select-none">{lang}</div>}
+            <code className="text-[13px] font-mono text-white/80 leading-relaxed font-light">{lines.join('\n')}</code>
+          </pre>
+        );
+      }
+      return <span key={index} dangerouslySetInnerHTML={{ __html: part.replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>').replace(/\n/g, '<br/>') }} />;
+    });
   };
 
   // ── Scan ─────────────────────────────────────────────────────────────
@@ -473,51 +501,35 @@ export default function Scanner() {
           try {
             const chunk = JSON.parse(line);
             
-            // Helper to recursively extract text from potentially raw Gemini/Langchain payloads
-            const extractText = (data: any): string => {
-              if (!data) return "";
-              
-              if (typeof data === "string") {
-                // Sometimes the string is literally a JSON payload
-                if (data.startsWith("{") && data.includes('"candidates"')) {
-                  try {
-                    const parsed = JSON.parse(data);
-                    if (parsed && parsed.candidates) {
-                      return extractText(parsed);
-                    }
-                  } catch {
-                    // Ignore parse errors, just return the string
+            if (chunk.type === "status") {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `status-${Date.now()}`,
+                  role: "status",
+                  content: chunk.content,
+                },
+              ]);
+            } else if (chunk.type === "tool_calls") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, toolCalls: chunk.tools } : m
+                )
+              );
+            } else if (chunk.type === "chunk") {
+              const textToAdd = chunk.text || "";
+              if (textToAdd) {
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last.id === assistantId) {
+                    return [
+                      ...prev.slice(0, -1),
+                      { ...last, content: last.content + textToAdd },
+                    ];
                   }
-                }
-                return data;
+                  return prev;
+                });
               }
-              
-              if (typeof data === "object") {
-                if (data.candidates && Array.isArray(data.candidates)) {
-                  const parts = data.candidates[0]?.content?.parts || [];
-                  return parts.map((p: any) => p.text || "").join("");
-                }
-                if (data.text) {
-                  return extractText(data.text);
-                }
-              }
-              
-              return "";
-            };
-
-            const textToAdd = extractText(chunk.type === "chunk" ? chunk.text : chunk);
-
-            if (textToAdd) {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last.id === assistantId) {
-                  return [
-                    ...prev.slice(0, -1),
-                    { ...last, content: last.content + textToAdd },
-                  ];
-                }
-                return prev;
-              });
             }
           } catch {
             /* skip malformed lines */
@@ -555,8 +567,8 @@ export default function Scanner() {
           id: `status-select-${Date.now()}`,
           role: "status",
           content: `Connected to ${repo.org}/${repo.repo}. Ask anything about the codebase.${
-            repo.phase2_status !== "complete"
-              ? " (AI summaries are still generating in the background)"
+            repo.phase2_status === "failed"
+              ? " (Warning: AI enrichment failed, falling back to AST summaries)"
               : ""
           }`,
         },
@@ -586,7 +598,9 @@ export default function Scanner() {
     return <UsernameScreen onSubmit={handleLogin} />;
   }
 
-  const canChat = activeRepo?.phase1_status === "complete";
+  const canChat = activeRepo?.phase1_status === "complete" && 
+                  activeRepo?.phase2_status !== "running" && 
+                  activeRepo?.phase2_status !== "pending";
 
   return (
     <div
@@ -788,90 +802,223 @@ export default function Scanner() {
         {/* ── Right Panel — Chat ──────────────────────────────────── */}
         <main className="flex-1 flex flex-col min-w-0">
           {!activeRepo ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center px-6">
-                <MessageSquare className="w-12 h-12 text-white/10 mx-auto mb-4" />
-                <h2
-                  className="text-lg font-semibold text-white/30"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  No repository selected
-                </h2>
-                <p className="text-sm text-white/15 mt-2 max-w-sm">
-                  Enter a GitHub URL on the left to scan a repository,
-                  then chat with it here.
-                </p>
+            <div className="flex-1 flex flex-col items-center p-8 bg-[#0A0A0A] overflow-y-auto custom-scrollbar">
+              <div className="w-full max-w-3xl mt-12 mb-8">
+                <h2 className="text-3xl text-white/90 font-medium mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Indexed Repositories</h2>
+                <p className="text-white/40 text-sm mb-8">Select a previously scanned repository from your catalog to start chatting immediately.</p>
+                
+                <div className="relative mb-6 leading-none">
+                  <Search className="w-5 h-5 text-white/30 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search your analyzed repositories..."
+                    value={repoSearch}
+                    onChange={(e) => setRepoSearch(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-white/20 transition-colors"
+                  />
+                </div>
+
+                <div className="grid gap-3">
+                  {repos.filter(r => r.repo.toLowerCase().includes(repoSearch.toLowerCase()) || r.org.toLowerCase().includes(repoSearch.toLowerCase())).map((repo) => (
+                    <div
+                      key={`${repo.org}/${repo.repo}`}
+                      onClick={() => { setActiveRepo(repo); setMessages([]); }}
+                      className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 rounded-xl cursor-pointer transition-all duration-300"
+                    >
+                      <div>
+                        <div className="text-white/90 font-medium flex items-center gap-2">
+                          <span className="text-white/30 font-normal">{repo.org}</span>
+                          <span className="text-white/30">/</span>
+                          <span className="">{repo.repo}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4 sm:mt-0">
+                         <span className={`text-[10px] px-3 py-1 uppercase tracking-wider rounded-full ${repo.phase1_status === 'complete' ? 'bg-[#ff3366]/10 text-[#ff3366]' : 'bg-yellow-500/10 text-yellow-500'}`}>P1: {repo.phase1_status}</span>
+                         <span className={`text-[10px] px-3 py-1 uppercase tracking-wider rounded-full ${repo.phase2_status === 'complete' ? 'bg-[#00f0ff]/10 text-[#00f0ff]' : 'bg-yellow-500/10 text-yellow-500'}`}>P2: {repo.phase2_status}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {repos.length === 0 && <div className="text-white/20 text-sm py-12 text-center rounded-xl bg-white/[0.01] border border-white/5 border-dashed">No repositories found. Paste a link on the left to scan one.</div>}
+                </div>
               </div>
             </div>
+          ) : !canChat && (
+              activeRepo.phase1_status === "running" || 
+              activeRepo.phase1_status === "pending" || 
+              activeRepo.phase2_status === "running" || 
+              activeRepo.phase2_status === "pending"
+          ) ? (
+             <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
+               <Loader2 className="w-8 h-8 text-white/40 animate-spin mb-6" />
+               <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                 {activeRepo.phase1_status !== "complete" ? "Indexing Repository" : "Enriching via LLM"}
+               </h2>
+               <p className="text-sm text-white/40 mb-10 max-w-md text-center leading-relaxed">
+                 {activeRepo.phase1_status !== "complete" 
+                   ? "Parsing ASTs, generating code embeddings, and extracting symbol definitions." 
+                   : "Generating AI-powered summaries for all codebase files and symbols."}
+               </p>
+               
+               {activeRepo.phase1_status !== "complete" ? (
+                 <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
+                 <div className="flex justify-between text-xs text-white/30 uppercase tracking-widest mb-6 pb-4 border-b border-white/5">
+                   <span>Progress Stats</span>
+                   <span>Phase 1</span>
+                 </div>
+                 <div className="space-y-5">
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Processed</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                       {activeRepo.stats?.files_processed || 0}
+                       {activeRepo.stats?.total_files_to_process ? ` / ${activeRepo.stats.total_files_to_process}` : ''}
+                     </span>
+                   </div>
+                   
+                   {activeRepo.stats?.total_files_to_process && (
+                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                       <div 
+                         className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                         style={{ width: `${Math.min(100, Math.round(((activeRepo.stats?.files_processed || 0) / activeRepo.stats.total_files_to_process) * 100))}%` }}
+                       />
+                     </div>
+                   )}
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Symbols Indexed</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.symbols_indexed || 0}</span>
+                   </div>
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Written</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.files_written || 0}</span>
+                   </div>
+                   <div className="flex justify-between items-center group">
+                     <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Call Edges Created</span>
+                     <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">{activeRepo.stats?.call_edges_created || 0}</span>
+                   </div>
+                 </div>
+               </div>
+               ) : (
+                 // PHASE 2 DASHBOARD
+                 <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
+                   <div className="flex justify-between text-xs text-white/30 uppercase tracking-widest mb-6 pb-4 border-b border-white/5">
+                     <span>Progress Stats</span>
+                     <span>Phase 2</span>
+                   </div>
+                   <div className="space-y-5">
+                     <div className="flex justify-between items-center group">
+                       <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Files Enriched</span>
+                       <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                         {activeRepo.phase2_stats?.files_enriched || 0}
+                         {activeRepo.phase2_stats?.total_files_to_enrich ? ` / ${activeRepo.phase2_stats.total_files_to_enrich}` : ''}
+                       </span>
+                     </div>
+                     {activeRepo.phase2_stats?.total_files_to_enrich && (
+                       <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                         <div 
+                           className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                           style={{ width: `${Math.min(100, Math.round(((activeRepo.phase2_stats?.files_enriched || 0) / activeRepo.phase2_stats.total_files_to_enrich) * 100))}%` }}
+                         />
+                       </div>
+                     )}
+                     <div className="flex justify-between items-center group">
+                       <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Symbols Enriched</span>
+                       <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                         {activeRepo.phase2_stats?.symbols_enriched || 0}
+                         {activeRepo.phase2_stats?.total_symbols_to_enrich ? ` / ${activeRepo.phase2_stats.total_symbols_to_enrich}` : ''}
+                       </span>
+                     </div>
+                     {activeRepo.phase2_stats?.total_symbols_to_enrich && (
+                       <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                         <div 
+                           className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                           style={{ width: `${Math.min(100, Math.round(((activeRepo.phase2_stats?.symbols_enriched || 0) / activeRepo.phase2_stats.total_symbols_to_enrich) * 100))}%` }}
+                         />
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
+             </div>
           ) : (
             <>
               {/* Chat Header */}
-              <div
-                className="flex items-center justify-between px-6 py-3 flex-shrink-0"
-                style={{
-                  borderBottom: "1px solid rgba(255,255,255,0.06)",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-white/70">
-                    {activeRepo.org}/{activeRepo.repo}
-                  </span>
-                  <div
-                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
-                    style={{ background: "rgba(255,255,255,0.06)" }}
-                  >
-                    <StatusDot status={activeRepo.phase1_status} />
-                    <span className="text-white/40" style={{ fontSize: "10px" }}>
-                      {activeRepo.phase1_status === "complete"
-                        ? activeRepo.phase2_status === "complete"
-                          ? "Fully indexed"
-                          : "Searchable (enriching...)"
-                        : activeRepo.phase1_status === "running"
-                          ? "Scanning..."
-                          : activeRepo.phase1_status}
-                    </span>
+              <div className="border-b border-white/5 p-4 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-10 rounded-t-2xl">
+                <div>
+                  <h3 className="text-white font-medium flex items-center space-x-2" style={{ fontFamily: "'Inter', sans-serif" }}>
+                    <MessageSquare size={16} className="text-blue-400" />
+                    <span>XMem Knowledge Graph</span>
+                  </h3>
+                  <p className="text-xs text-white/40 mt-1">{activeRepo.org}/{activeRepo.repo}</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-white/40 uppercase tracking-widest font-medium">Debug Mode</span>
+                    <button 
+                      onClick={() => setDebugMode(!debugMode)}
+                      className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${debugMode ? 'bg-blue-500/80' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-300 ${debugMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
                   </div>
+                  <button
+                    onClick={() => setActiveRepo(null)}
+                    className="text-xs text-white/40 hover:text-white transition-colors uppercase tracking-widest"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`max-w-3xl ${msg.role === "user" ? "ml-auto" : ""}`}
-                  >
-                    {msg.role === "status" ? (
-                      <div
-                        className="flex items-start gap-2 px-3 py-2 rounded-lg"
-                        style={{
-                          background: "rgba(255,255,255,0.03)",
-                        }}
-                      >
-                        <Circle className="w-3 h-3 text-white/30 mt-0.5 flex-shrink-0" />
-                        <span className="text-xs text-white/40">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                {messages.map((msg) => {
+                  const isUser = msg.role === "user";
+                  
+                  if (msg.role === "status") {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-2">
+                        <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] text-white/30 uppercase tracking-widest">
                           {msg.content}
-                        </span>
+                        </div>
                       </div>
-                    ) : msg.role === "user" ? (
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex ${
+                        isUser ? "justify-end" : "justify-start"
+                      }`}
+                    >
                       <div
-                        className="inline-block px-4 py-2.5 rounded-xl text-sm text-white"
-                        style={{
-                          background: "rgba(255,255,255,0.08)",
-                        }}
+                        className={`max-w-[85%] rounded-2xl p-4 ${
+                          isUser
+                            ? "bg-gradient-to-br from-blue-600/20 to-blue-500/10 text-white/90 border border-blue-500/20"
+                            : "bg-white/5 text-white/80 border border-white/10"
+                        }`}
                       >
-                        {msg.content}
+                        <div className="text-sm font-light leading-relaxed">
+                          {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
+                        </div>
+                        
+                        {debugMode && msg.toolCalls && msg.toolCalls.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2">
+                             <span className="text-[10px] text-white/30 uppercase tracking-widest">Graph Tool Invocations ({msg.toolCalls.length})</span>
+                             {msg.toolCalls.map((tc, idx) => (
+                               <div key={idx} className="bg-black/40 rounded p-3 font-mono text-[11px] text-white/60 border border-white/5">
+                                 <span className="text-purple-400">{tc.name}</span>
+                                 <span className="text-white/30">(</span>
+                                 <span className="text-blue-300/80">{JSON.stringify(tc.args)}</span>
+                                 <span className="text-white/30">)</span>
+                               </div>
+                             ))}
+                          </div>
+                        )}
+
                       </div>
-                    ) : (
-                      <div className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">
-                        {msg.content ||
-                          (chatLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-white/30" />
-                          ) : null)}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
                 <div ref={chatEndRef} />
               </div>
 

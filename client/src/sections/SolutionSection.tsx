@@ -68,7 +68,10 @@ export function SolutionSection() {
                       ? { opacity: 1, y: 0, filter: "blur(0px)" }
                       : { opacity: 0, y: 16, filter: "blur(10px)" }
                   }
-                  transition={{ duration: 0.55, ease: [0.21, 0.47, 0.32, 0.98] }}
+                  transition={{
+                    duration: 0.55,
+                    ease: [0.21, 0.47, 0.32, 0.98],
+                  }}
                   className="mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs uppercase tracking-widest text-white/50"
                   style={{ border: "1px solid rgba(255,255,255,0.08)" }}
                 >
@@ -195,7 +198,9 @@ export function SolutionSection() {
               >
                 <div className="flex h-full flex-col gap-4 rounded-xl p-6">
                   <f.icon className="w-5 h-5 text-white/60" />
-                  <h3 className="font-semibold text-white text-sm">{f.title}</h3>
+                  <h3 className="font-semibold text-white text-sm">
+                    {f.title}
+                  </h3>
                   <p className="text-white/40 text-xs leading-relaxed">
                     {f.desc}
                   </p>
