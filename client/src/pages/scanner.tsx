@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   ArrowLeft,
   Send,
@@ -8,7 +8,10 @@ import {
   GitBranch,
   Lock,
   MessageSquare,
-  Search
+  Search,
+  Globe,
+  Users,
+  Star,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
@@ -18,6 +21,8 @@ interface RepoEntry {
   repo: string;
   phase1_status: string;
   phase2_status: string;
+  /** When true, any scanner user may query this index (saves re-scan cost for others). */
+  share_index_publicly?: boolean;
   stats?: any;
   phase2_stats?: any;
 }
@@ -38,6 +43,13 @@ interface ChatMessage {
   role: "user" | "assistant" | "status";
   content: string;
   toolCalls?: any[];
+}
+
+interface CommunityItem {
+  org: string;
+  repo: string;
+  star_count: number;
+  starred_by_me: boolean;
 }
 
 function StatusDot({ status }: { status: string }) {
@@ -154,7 +166,31 @@ export default function Scanner() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [sharingSaving, setSharingSaving] = useState(false);
+  const [scannerTab, setScannerTab] = useState<"mine" | "community">("mine");
+  const [communityItems, setCommunityItems] = useState<CommunityItem[]>([]);
+  const [communityTotal, setCommunityTotal] = useState(0);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communitySearch, setCommunitySearch] = useState("");
+  const [communitySort, setCommunitySort] = useState<"stars" | "recent">("stars");
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const indexingRepos = useMemo(() => {
+    const pred = (r: RepoEntry) =>
+      r.phase1_status === "running" ||
+      r.phase2_status === "running" ||
+      r.phase2_status === "pending";
+    const fromList = repos.filter(pred);
+    const keys = new Set(fromList.map((r) => `${r.org}/${r.repo}`));
+    if (
+      activeRepo &&
+      pred(activeRepo) &&
+      !keys.has(`${activeRepo.org}/${activeRepo.repo}`)
+    ) {
+      return [...fromList, activeRepo];
+    }
+    return fromList;
+  }, [repos, activeRepo]);
 
   // ── Load persisted repos from API ─────────────────────────────────
 
@@ -175,6 +211,8 @@ export default function Scanner() {
             repo: r.repo,
             phase1_status: r.phase1_status || "not_started",
             phase2_status: r.phase2_status || "not_started",
+            share_index_publicly:
+              r.share_index_publicly !== undefined ? r.share_index_publicly : true,
           })),
         );
       } catch {
@@ -187,19 +225,49 @@ export default function Scanner() {
     };
   }, [isLoggedIn, username]);
 
-  // ── Poll running scans ──────────────────────────────────────────────
+  // ── Community catalog ───────────────────────────────────────────────
 
   useEffect(() => {
-    const running = repos.filter(
-      (r) => r.phase1_status === "running" || r.phase2_status === "running",
-    );
-    if (running.length === 0) return;
+    if (!isLoggedIn || !username.trim() || scannerTab !== "community") return;
+
+    let cancelled = false;
+    (async () => {
+      setCommunityLoading(true);
+      try {
+        const params = new URLSearchParams({
+          username: username.trim(),
+          q: communitySearch.trim(),
+          sort: communitySort,
+          limit: "80",
+          offset: "0",
+        });
+        const resp = await fetch(`${API_URL}/v1/scanner/community?${params}`);
+        const data = await resp.json();
+        if (cancelled || data.status !== "ok") return;
+        setCommunityItems(Array.isArray(data.items) ? data.items : []);
+        setCommunityTotal(typeof data.total === "number" ? data.total : 0);
+      } catch {
+        if (!cancelled) setCommunityItems([]);
+      } finally {
+        if (!cancelled) setCommunityLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, username, scannerTab, communitySearch, communitySort]);
+
+  // ── Poll in-progress scans (catalog-aware) ──────────────────────────
+
+  useEffect(() => {
+    if (!username || indexingRepos.length === 0) return;
 
     const interval = setInterval(async () => {
-      for (const repo of running) {
+      for (const repo of indexingRepos) {
         try {
           const resp = await fetch(
-            `${API_URL}/v1/scanner/status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(repo.org)}&repo=${encodeURIComponent(repo.repo)}`,
+            `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(repo.org)}&repo=${encodeURIComponent(repo.repo)}`,
           );
           const data = await resp.json();
 
@@ -212,6 +280,10 @@ export default function Scanner() {
                     phase2_status: data.phase2_status,
                     stats: data.stats,
                     phase2_stats: data.phase2_stats,
+                    share_index_publicly:
+                      data.share_index_publicly !== undefined
+                        ? data.share_index_publicly
+                        : r.share_index_publicly,
                   }
                 : r,
             ),
@@ -225,10 +297,16 @@ export default function Scanner() {
                 phase2_status: data.phase2_status,
                 stats: data.stats,
                 phase2_stats: data.phase2_stats,
+                share_index_publicly:
+                  data.share_index_publicly !== undefined
+                    ? data.share_index_publicly
+                    : prev.share_index_publicly,
               };
 
-              // Emulate initial "complete" message trigger
-              if (data.phase1_status === "complete" && prev.phase1_status === "running") {
+              if (
+                data.phase1_status === "complete" &&
+                prev.phase1_status === "running"
+              ) {
                 setMessages((msgs) => [
                   ...msgs,
                   {
@@ -250,7 +328,7 @@ export default function Scanner() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [repos, username]);
+  }, [indexingRepos, username]);
 
   useEffect(() => {
     if (!username) return;
@@ -285,6 +363,8 @@ export default function Scanner() {
     setRepos([]);
     setActiveRepo(null);
     setMessages([]);
+    setScannerTab("mine");
+    setCommunityItems([]);
   };
 
   const renderMarkdown = (text: string) => {
@@ -333,6 +413,7 @@ export default function Scanner() {
         repo: data.repo,
         phase1_status: data.phase1_status || "running",
         phase2_status: data.phase2_status || "pending",
+        share_index_publicly: true,
       };
 
       setRepos((prev) => {
@@ -447,6 +528,171 @@ export default function Scanner() {
     }
   };
 
+  // ── Community index sharing (catalog visibility) ─────────────────────
+
+  const setShareIndexPublicly = async (next: boolean) => {
+    if (!activeRepo || activeRepo.phase1_status !== "complete") return;
+    setSharingSaving(true);
+    try {
+      const resp = await fetch(`${API_URL}/v1/scanner/index-visibility`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          org_id: activeRepo.org,
+          repo: activeRepo.repo,
+          share_index_publicly: next,
+        }),
+      });
+      const data = await resp.json();
+      if (data.status === "error") {
+        setMessages((m) => [
+          ...m,
+          {
+            id: `share-err-${Date.now()}`,
+            role: "status",
+            content: data.error || "Could not update sharing.",
+          },
+        ]);
+        return;
+      }
+      const v = Boolean(data.share_index_publicly);
+      setActiveRepo((p) => (p ? { ...p, share_index_publicly: v } : p));
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.org === activeRepo.org && r.repo === activeRepo.repo
+            ? { ...r, share_index_publicly: v }
+            : r,
+        ),
+      );
+    } catch {
+      setMessages((m) => [
+        ...m,
+        {
+          id: `share-net-${Date.now()}`,
+          role: "status",
+          content: "Network error updating sharing.",
+        },
+      ]);
+    } finally {
+      setSharingSaving(false);
+    }
+  };
+
+  const openCommunityRepo = async (org: string, repoName: string) => {
+    try {
+      const resp = await fetch(
+        `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(org)}&repo=${encodeURIComponent(repoName)}`,
+      );
+      const data = await resp.json();
+      const entry: RepoEntry = {
+        org,
+        repo: repoName,
+        phase1_status: data.phase1_status || "not_started",
+        phase2_status: data.phase2_status || "not_started",
+        share_index_publicly: data.share_index_publicly !== false,
+        stats: data.stats,
+        phase2_stats: data.phase2_stats,
+      };
+      setActiveRepo(entry);
+      setMessages([
+        {
+          id: `comm-open-${Date.now()}`,
+          role: "status",
+          content: `Opened ${org}/${repoName} from the community catalog. Ask questions about this codebase.`,
+        },
+      ]);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        {
+          id: `comm-fail-${Date.now()}`,
+          role: "status",
+          content: "Could not load repository status. Try again.",
+        },
+      ]);
+    }
+  };
+
+  const toggleCommunityStar = async (
+    org: string,
+    repoName: string,
+    nextStarred: boolean,
+  ) => {
+    setCommunityItems((prev) =>
+      prev.map((it) =>
+        it.org === org && it.repo === repoName
+          ? {
+              ...it,
+              starred_by_me: nextStarred,
+              star_count: Math.max(
+                0,
+                it.star_count + (nextStarred ? 1 : -1),
+              ),
+            }
+          : it,
+      ),
+    );
+    try {
+      const resp = await fetch(`${API_URL}/v1/scanner/community/star`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          org_id: org,
+          repo: repoName,
+          starred: nextStarred,
+        }),
+      });
+      const data = await resp.json();
+      if (data.status === "error") {
+        setCommunityItems((prev) =>
+          prev.map((it) =>
+            it.org === org && it.repo === repoName
+              ? {
+                  ...it,
+                  starred_by_me: !nextStarred,
+                  star_count: Math.max(
+                    0,
+                    it.star_count + (nextStarred ? -1 : 1),
+                  ),
+                }
+              : it,
+          ),
+        );
+        return;
+      }
+      if (typeof data.star_count === "number") {
+        setCommunityItems((prev) =>
+          prev.map((it) =>
+            it.org === org && it.repo === repoName
+              ? {
+                  ...it,
+                  star_count: data.star_count,
+                  starred_by_me: data.starred,
+                }
+              : it,
+          ),
+        );
+      }
+    } catch {
+      setCommunityItems((prev) =>
+        prev.map((it) =>
+          it.org === org && it.repo === repoName
+            ? {
+                ...it,
+                starred_by_me: !nextStarred,
+                star_count: Math.max(
+                  0,
+                  it.star_count + (nextStarred ? -1 : 1),
+                ),
+              }
+            : it,
+        ),
+      );
+    }
+  };
+
   // ── Chat ─────────────────────────────────────────────────────────────
 
   const handleSendMessage = async () => {
@@ -481,6 +727,29 @@ export default function Scanner() {
           top_k: 10,
         }),
       });
+
+      if (!resp.ok) {
+        let msg = "You do not have access to chat on this index.";
+        try {
+          const errBody = await resp.json();
+          if (errBody?.error && typeof errBody.error === "string") {
+            msg = errBody.error;
+          }
+        } catch {
+          /* use default */
+        }
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last.id === assistantId) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: msg },
+            ];
+          }
+          return prev;
+        });
+        return;
+      }
 
       if (!resp.body) throw new Error("No response body");
 
@@ -636,9 +905,39 @@ export default function Scanner() {
       <div className="flex flex-1 overflow-hidden">
         {/* ── Left Panel ──────────────────────────────────────────── */}
         <aside
-          className="w-80 flex-shrink-0 flex flex-col overflow-y-auto"
+          className="w-80 flex-shrink-0 flex flex-col min-h-0 overflow-hidden"
           style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
         >
+          <div
+            className="flex-shrink-0 flex gap-1 p-2"
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <button
+              type="button"
+              onClick={() => setScannerTab("mine")}
+              className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                scannerTab === "mine"
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/70"
+              }`}
+            >
+              My catalog
+            </button>
+            <button
+              type="button"
+              onClick={() => setScannerTab("community")}
+              className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                scannerTab === "community"
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/70"
+              }`}
+            >
+              Community
+            </button>
+          </div>
+
+          {scannerTab === "mine" ? (
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
           {/* URL Input */}
           <form
             onSubmit={handleSubmitUrl}
@@ -779,6 +1078,16 @@ export default function Scanner() {
                           {r.org}/{r.repo}
                         </span>
                         <div className="flex items-center gap-1.5">
+                          {(r.share_index_publicly !== false) && (
+                            <span className="shrink-0" aria-label="Community index sharing on">
+                              <Globe className="w-3 h-3 text-emerald-400/80" />
+                            </span>
+                          )}
+                          {r.share_index_publicly === false && (
+                            <span className="shrink-0" aria-label="Index private to scanners of this repo">
+                              <Lock className="w-3 h-3 text-white/25" />
+                            </span>
+                          )}
                           <StatusDot status={r.phase1_status} />
                           <StatusDot status={r.phase2_status} />
                         </div>
@@ -797,6 +1106,116 @@ export default function Scanner() {
               </div>
             )}
           </div>
+          </div>
+          ) : (
+          <div className="flex-1 flex flex-col min-h-0 p-3 gap-3">
+            <p className="text-[10px] text-white/35 leading-relaxed">
+              Public indexes anyone can open — star repos you care about. No link required.
+            </p>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-white/25 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={communitySearch}
+                onChange={(e) => setCommunitySearch(e.target.value)}
+                placeholder="Search org or repo…"
+                className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-white/20"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCommunitySort("stars")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-[10px] uppercase tracking-wider ${
+                  communitySort === "stars"
+                    ? "bg-white/12 text-white"
+                    : "bg-white/5 text-white/40 hover:text-white/65"
+                }`}
+              >
+                Most stars
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommunitySort("recent")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-[10px] uppercase tracking-wider ${
+                  communitySort === "recent"
+                    ? "bg-white/12 text-white"
+                    : "bg-white/5 text-white/40 hover:text-white/65"
+                }`}
+              >
+                Recent
+              </button>
+            </div>
+            <p className="text-[10px] text-white/30">
+              {communityLoading ? "Loading…" : `${communityTotal} in catalog`}
+            </p>
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-1 pr-1">
+              {communityLoading && communityItems.length === 0 ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-white/30 animate-spin" />
+                </div>
+              ) : (
+                communityItems.map((it) => {
+                  const isActive =
+                    activeRepo?.org === it.org && activeRepo?.repo === it.repo;
+                  return (
+                    <div
+                      key={`${it.org}/${it.repo}`}
+                      className="rounded-lg border border-white/6 px-2 py-2"
+                      style={{
+                        background: isActive
+                          ? "rgba(255,255,255,0.06)"
+                          : "rgba(255,255,255,0.02)",
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openCommunityRepo(it.org, it.repo)}
+                          className="flex-1 text-left min-w-0"
+                        >
+                          <span className="text-white/85 font-mono text-[11px] block truncate">
+                            {it.org}/{it.repo}
+                          </span>
+                          <span className="text-[10px] text-white/35">
+                            Tap to chat
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCommunityStar(it.org, it.repo, !it.starred_by_me);
+                          }}
+                          className={`flex flex-col items-center shrink-0 rounded-md px-1.5 py-1 transition-colors ${
+                            it.starred_by_me
+                              ? "text-amber-400/90"
+                              : "text-white/35 hover:text-white/55"
+                          }`}
+                          title={it.starred_by_me ? "Unstar" : "Star"}
+                        >
+                          <Star
+                            className="w-3.5 h-3.5"
+                            fill={it.starred_by_me ? "currentColor" : "none"}
+                          />
+                          <span className="text-[9px] tabular-nums mt-0.5">
+                            {it.star_count}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              {!communityLoading && communityItems.length === 0 && (
+                <p className="text-xs text-white/25 py-6 text-center px-2">
+                  No public indexes yet. Scan a repo and enable community sharing, or wait for
+                  indexes to finish indexing.
+                </p>
+              )}
+            </div>
+          </div>
+          )}
         </aside>
 
         {/* ── Right Panel — Chat ──────────────────────────────────── */}
@@ -805,7 +1224,10 @@ export default function Scanner() {
             <div className="flex-1 flex flex-col items-center p-8 bg-[#0A0A0A] overflow-y-auto custom-scrollbar">
               <div className="w-full max-w-3xl mt-12 mb-8">
                 <h2 className="text-3xl text-white/90 font-medium mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Indexed Repositories</h2>
-                <p className="text-white/40 text-sm mb-8">Select a previously scanned repository from your catalog to start chatting immediately.</p>
+                <p className="text-white/40 text-sm mb-8">
+                  Select a repository from <span className="text-white/55">My catalog</span>, or open the{" "}
+                  <span className="text-white/55">Community</span> tab to browse public indexes, star repos, and chat without sharing links.
+                </p>
                 
                 <div className="relative mb-6 leading-none">
                   <Search className="w-5 h-5 text-white/30 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -942,12 +1364,69 @@ export default function Scanner() {
             <>
               {/* Chat Header */}
               <div className="border-b border-white/5 p-4 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-10 rounded-t-2xl">
-                <div>
+                <div className="min-w-0 flex-1">
                   <h3 className="text-white font-medium flex items-center space-x-2" style={{ fontFamily: "'Inter', sans-serif" }}>
                     <MessageSquare size={16} className="text-blue-400" />
                     <span>XMem Knowledge Graph</span>
                   </h3>
                   <p className="text-xs text-white/40 mt-1">{activeRepo.org}/{activeRepo.repo}</p>
+                  {activeRepo.phase1_status === "complete" && (
+                    <div
+                      className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg px-3 py-2.5"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <div className="flex items-start gap-2 min-w-0">
+                        {(activeRepo.share_index_publicly !== false) ? (
+                          <Globe className="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5" />
+                        ) : (
+                          <Lock className="w-4 h-4 text-white/35 shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-white/55 leading-snug">
+                            <span className="text-white/75 font-medium">Community index</span>
+                            {" — "}
+                            {(activeRepo.share_index_publicly !== false)
+                              ? "Anyone can ask questions on this revision without re-scanning (shared catalog)."
+                              : "Only accounts that ran a scan for this repo can query it. Enable sharing to let everyone reuse this index."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 sm:ml-auto">
+                        <Users className="w-3.5 h-3.5 text-white/30" />
+                        <span className="text-[10px] text-white/40 uppercase tracking-wider">Share</span>
+                        <button
+                          type="button"
+                          disabled={sharingSaving}
+                          onClick={() =>
+                            setShareIndexPublicly(
+                              activeRepo.share_index_publicly === false,
+                            )
+                          }
+                          className={`relative w-10 h-5 rounded-full transition-colors duration-200 disabled:opacity-50 ${
+                            activeRepo.share_index_publicly !== false
+                              ? "bg-emerald-600/70"
+                              : "bg-white/15"
+                          }`}
+                          title={
+                            (activeRepo.share_index_publicly !== false)
+                              ? "Click to make index private to scanners of this repo"
+                              : "Click to share index with all scanner users"
+                          }
+                        >
+                          <span
+                            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                              activeRepo.share_index_publicly !== false
+                                ? "translate-x-5"
+                                : "translate-x-0.5"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
