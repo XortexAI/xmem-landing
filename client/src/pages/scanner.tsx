@@ -22,7 +22,18 @@ interface RepoEntry {
   phase2_stats?: any;
 }
 
-export interface ChatMessage {
+interface ScanEstimates {
+  estimate_disclaimer: string;
+  branch_used_for_label: string;
+  repo_size_kb: number;
+  estimated_phase1_seconds: number;
+  estimated_embedding_api_calls: number;
+  estimated_embedding_tokens: number;
+  estimated_phase2_llm_tokens: number;
+  estimated_cost_usd: number | null;
+}
+
+interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "status";
   content: string;
@@ -133,6 +144,7 @@ export default function Scanner() {
   const [validating, setValidating] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [inputError, setInputError] = useState("");
+  const [estimates, setEstimates] = useState<ScanEstimates | null>(null);
 
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
@@ -143,6 +155,37 @@ export default function Scanner() {
   const [chatLoading, setChatLoading] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Load persisted repos from API ─────────────────────────────────
+
+  useEffect(() => {
+    if (!isLoggedIn || !username.trim()) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch(
+          `${API_URL}/v1/scanner/repos?username=${encodeURIComponent(username)}`,
+        );
+        const data = await resp.json();
+        if (cancelled || data.status !== "ok" || !Array.isArray(data.repos)) return;
+        setRepos(
+          data.repos.map((r: RepoEntry) => ({
+            org: r.org,
+            repo: r.repo,
+            phase1_status: r.phase1_status || "not_started",
+            phase2_status: r.phase2_status || "not_started",
+          })),
+        );
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, username]);
 
   // ── Poll running scans ──────────────────────────────────────────────
 
@@ -308,6 +351,34 @@ export default function Scanner() {
       setGithubUrl("");
       setPat("");
       setShowPat(false);
+      setEstimates(null);
+
+      if (data.reused) {
+        setMessages([
+          {
+            id: `status-reused-${Date.now()}`,
+            role: "status",
+            content:
+              data.message ||
+              `${newRepo.org}/${newRepo.repo} is already indexed at this commit. You can chat now.`,
+          },
+        ]);
+        return;
+      }
+
+      if (data.phase2_only) {
+        setMessages([
+          {
+            id: `status-p2-${Date.now()}`,
+            role: "status",
+            content:
+              data.message ||
+              `Phase 1 data exists for ${newRepo.org}/${newRepo.repo}. Running Phase 2 (LLM enrichment) only. Chat is available while summaries update.`,
+          },
+        ]);
+        return;
+      }
+
       setMessages([
         {
           id: `status-scan-${Date.now()}`,
@@ -341,6 +412,7 @@ export default function Scanner() {
         body: JSON.stringify({
           github_url: githubUrl.trim(),
           pat: pat.trim(),
+          branch: branch.trim() || "",
         }),
       });
       const data = await resp.json();
@@ -360,6 +432,9 @@ export default function Scanner() {
 
       if (data.accessible) {
         if (data.default_branch) setBranch(data.default_branch);
+        if (data.estimates) setEstimates(data.estimates as ScanEstimates);
+        // Yield so the estimate panel can paint before the long-running scan starts.
+        await new Promise((r) => setTimeout(r, 80));
         await triggerScan();
         return;
       }
@@ -506,6 +581,14 @@ export default function Scanner() {
           content: `Scanning ${repo.org}/${repo.repo}... Chat will be available once Phase 1 completes.`,
         },
       ]);
+    } else {
+      setMessages([
+        {
+          id: `status-pending-${Date.now()}`,
+          role: "status",
+          content: `${repo.org}/${repo.repo} is not indexed yet. Start a scan from the URL field.`,
+        },
+      ]);
     }
   };
 
@@ -572,6 +655,7 @@ export default function Scanner() {
                 setGithubUrl(e.target.value);
                 setInputError("");
                 setShowPat(false);
+                setEstimates(null);
               }}
               placeholder="https://github.com/org/repo"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors font-mono"
@@ -625,6 +709,40 @@ export default function Scanner() {
 
             {inputError && (
               <p className="mt-2 text-xs text-white/50">{inputError}</p>
+            )}
+
+            {estimates && (
+              <div
+                className="mt-3 rounded-lg p-3 space-y-1.5"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <p className="text-[10px] text-white/35 leading-snug">
+                  {estimates.estimate_disclaimer}
+                </p>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-white/45">
+                  <span>Phase 1 (est.)</span>
+                  <span className="text-white/60 text-right">
+                    ~{estimates.estimated_phase1_seconds}s
+                  </span>
+                  <span>Embedding tokens (est.)</span>
+                  <span className="text-white/60 text-right">
+                    ~{estimates.estimated_embedding_tokens.toLocaleString()}
+                  </span>
+                  <span>Phase 2 LLM tokens (est.)</span>
+                  <span className="text-white/60 text-right">
+                    ~{estimates.estimated_phase2_llm_tokens.toLocaleString()}
+                  </span>
+                  <span>Cost (est.)</span>
+                  <span className="text-white/60 text-right">
+                    {estimates.estimated_cost_usd != null
+                      ? `~$${estimates.estimated_cost_usd.toFixed(4)}`
+                      : "—"}
+                  </span>
+                </div>
+              </div>
             )}
           </form>
 
