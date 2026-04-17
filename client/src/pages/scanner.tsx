@@ -394,6 +394,7 @@ export default function Scanner() {
         .replace(/^### (.*?)$/gm, '<h3 class="text-lg font-bold text-white mt-4 mb-2">$1</h3>')
         .replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold text-white mt-5 mb-3">$1</h2>')
         .replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold text-white mt-6 mb-4">$1</h1>')
+        .replace(/^---+\s*$/gm, '<hr class="border-white/10 my-6" />')
         .replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>')
         .replace(/`([^`\n]+)`/g, '<code class="bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono text-white/90">$1</code>')
         .replace(/^[\*-] (.*?)$/gm, '<li class="ml-4 list-disc mt-1">$1</li>')
@@ -402,6 +403,7 @@ export default function Scanner() {
         .replace(/<\/h2><br\/>/g, '</h2>')
         .replace(/<\/h3><br\/>/g, '</h3>')
         .replace(/<\/h4><br\/>/g, '</h4>')
+        .replace(/<hr class="border-white\/10 my-6" \/><br\/>/g, '<hr class="border-white/10 my-6" />')
         .replace(/<\/li><br\/>/g, '</li>');
 
       return <span key={index} className="text-white/80 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />;
