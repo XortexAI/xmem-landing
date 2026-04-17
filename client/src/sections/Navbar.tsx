@@ -1,15 +1,33 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LayoutDashboard, LogOut, User } from "lucide-react";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const handleLogout = () => {
+    logout();
+    setLocation('/');
+  };
 
   return (
     <motion.nav
@@ -22,37 +40,70 @@ export function Navbar() {
       }}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 cursor-pointer">
           <img
             src="/logo.png"
             alt="Xmem"
             className="h-8 w-auto invert"
           />
-        </div>
-        {/* <div className="hidden md:flex items-center gap-8">
-          {["Product", "Docs", "Enterprise", "Pricing"].map((item) => (
-            <a
-              key={item}
-              href="#"
-              className="text-sm text-white/60 hover:text-white transition-colors duration-200"
-              style={{ letterSpacing: "0.01em" }}
-            >
-              {item}
-            </a>
-          ))}
-        </div> */}
+        </Link>
+
         <div className="flex items-center gap-3">
-          <button className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2">
-            Log in
-          </button>
-          <Link
-            href="/scanner"
-            data-testid="button-get-started-nav"
-            className="text-sm font-medium px-4 py-2 rounded-md transition-all duration-200"
-            style={{ background: "white", color: "black" }}
-          >
-            Get Started
-          </Link>
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
+                  <Avatar className="h-9 w-9 border border-gray-700">
+                    <AvatarImage src={user?.picture} alt={user?.name} />
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
+                      {user?.name?.charAt(0).toUpperCase() || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 bg-[#111] border-gray-800 text-white" align="end" forceMount>
+                <div className="flex items-center gap-2 p-2">
+                  <div className="flex flex-col space-y-0.5">
+                    <p className="text-sm font-medium text-white">{user?.name}</p>
+                    <p className="text-xs text-gray-400 truncate max-w-[200px]">{user?.email}</p>
+                  </div>
+                </div>
+                <DropdownMenuSeparator className="bg-gray-800" />
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-gray-800 focus:text-white"
+                  onClick={() => setLocation('/dashboard')}
+                >
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-gray-800" />
+                <DropdownMenuItem
+                  className="cursor-pointer text-red-400 focus:bg-red-900/20 focus:text-red-400"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/scanner"
+                data-testid="button-get-started-nav"
+                className="text-sm font-medium px-4 py-2 rounded-md transition-all duration-200"
+                style={{ background: "white", color: "black" }}
+              >
+                Get Started
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </motion.nav>
