@@ -12,6 +12,7 @@ import {
   Globe,
   Users,
   Star,
+  Copy,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
@@ -395,8 +396,14 @@ export default function Scanner() {
         .replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold text-white mt-5 mb-3">$1</h2>')
         .replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold text-white mt-6 mb-4">$1</h1>')
         .replace(/^---+\s*$/gm, '<hr class="border-white/10 my-6" />')
+        // table row parsing
+        .replace(/^\|(.*?)\| ?$/gm, (match, p1) => {
+          if (p1.replace(/[-:\s|]/g, '').length === 0) return '';
+          const cells = p1.split('|').map((c: string) => `<td class="border-b border-white/5 bg-white/[0.01] px-4 py-2.5 text-white/80 whitespace-normal align-top leading-relaxed">${c.trim()}</td>`).join('');
+          return `<tr class="hover:bg-white/[0.03] transition-colors">${cells}</tr>`;
+        })
         .replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>')
-        .replace(/`([^`\n]+)`/g, '<code class="bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono text-white/90">$1</code>')
+        .replace(/`([^`\n]+)`/g, '<code class="bg-white/10 px-1.5 py-0.5 rounded text-[13px] font-mono text-white/90">$1</code>')
         .replace(/^[\*-] (.*?)$/gm, '<li class="ml-4 list-disc mt-1">$1</li>')
         .replace(/\n/g, '<br/>')
         .replace(/<\/h1><br\/>/g, '</h1>')
@@ -404,7 +411,12 @@ export default function Scanner() {
         .replace(/<\/h3><br\/>/g, '</h3>')
         .replace(/<\/h4><br\/>/g, '</h4>')
         .replace(/<hr class="border-white\/10 my-6" \/><br\/>/g, '<hr class="border-white/10 my-6" />')
-        .replace(/<\/li><br\/>/g, '</li>');
+        .replace(/<\/li><br\/>/g, '</li>')
+        // aggregate table rows into a full table
+        .replace(/(<tr class="hover:bg-white\/\[0\.03\] transition-colors">.*?<\/tr>(?:<br\/>)*)+/g, (match) => {
+          const cleanMatch = match.replace(/<br\/>/g, '');
+          return `<div class="rounded-xl overflow-x-auto border border-white/10 my-6 bg-black/40"><table class="w-full text-left text-sm border-collapse"><tbody>${cleanMatch}</tbody></table></div>`;
+        });
 
       return <span key={index} className="text-white/80 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />;
     });
@@ -1506,6 +1518,18 @@ export default function Scanner() {
                         <div className="text-sm font-light leading-relaxed">
                           {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
                         </div>
+                        
+                        {!isUser && msg.content && (
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              onClick={() => navigator.clipboard.writeText(msg.content)}
+                              className="text-white/20 hover:text-white/60 transition-colors p-1"
+                              title="Copy to clipboard"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                         
                         {debugMode && msg.toolCalls && msg.toolCalls.length > 0 && (
                           <div className="mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2">
