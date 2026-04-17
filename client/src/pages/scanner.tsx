@@ -161,6 +161,7 @@ export default function Scanner() {
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
   const [repoSearch, setRepoSearch] = useState("");
+  const [showShareTooltip, setShowShareTooltip] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -1369,66 +1370,62 @@ export default function Scanner() {
                     <MessageSquare size={16} className="text-blue-400" />
                     <span>XMem Knowledge Graph</span>
                   </h3>
-                  <p className="text-xs text-white/40 mt-1">{activeRepo.org}/{activeRepo.repo}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-white/40">{activeRepo.org}/{activeRepo.repo}</p>
+                    {activeRepo.phase1_status === "complete" && (
+                      activeRepo.share_index_publicly !== false ? (
+                        <Globe className="w-3 h-3 text-emerald-400/50" />
+                      ) : (
+                        <Lock className="w-3 h-3 text-white/20" />
+                      )
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  {/* Share Toggle */}
                   {activeRepo.phase1_status === "complete" && (
-                    <div
-                      className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg px-3 py-2.5"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                      }}
-                    >
-                      <div className="flex items-start gap-2 min-w-0">
-                        {(activeRepo.share_index_publicly !== false) ? (
-                          <Globe className="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5" />
-                        ) : (
-                          <Lock className="w-4 h-4 text-white/35 shrink-0 mt-0.5" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-[11px] text-white/55 leading-snug">
-                            <span className="text-white/75 font-medium">Community index</span>
-                            {" — "}
-                            {(activeRepo.share_index_publicly !== false)
-                              ? "Anyone can ask questions on this revision without re-scanning (shared catalog)."
-                              : "Only accounts that ran a scan for this repo can query it. Enable sharing to let everyone reuse this index."}
-                          </p>
+                    <div className="flex items-center space-x-2 relative">
+                      <span
+                        onMouseEnter={() => setShowShareTooltip(true)}
+                        onMouseLeave={() => setShowShareTooltip(false)}
+                        className="text-[10px] text-white/40 uppercase tracking-widest font-bold cursor-default hover:text-white/60 transition-colors"
+                      >
+                        Public index
+                      </span>
+
+                      {showShareTooltip && (
+                        <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-[#111] border border-white/10 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] z-[60] pointer-events-none">
+                          <div className="flex items-start gap-2">
+                            {activeRepo.share_index_publicly !== false ? (
+                              <Globe className="w-3.5 h-3.5 text-emerald-400/70 mt-0.5 shrink-0" />
+                            ) : (
+                              <Lock className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                            )}
+                            <p className="text-[11px] text-white/70 leading-relaxed font-normal normal-case tracking-normal">
+                              {activeRepo.share_index_publicly !== false
+                                ? "Anyone can ask questions or chat with this repository on this revision without re-scanning (shared index catalog)."
+                                : "Only users who have personally scanned this repository can query it. Enable sharing to let others reuse this index and save processing time."}
+                            </p>
+                          </div>
+                          <div className="absolute top-0 right-10 -translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-white/10" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 sm:ml-auto">
-                        <Users className="w-3.5 h-3.5 text-white/30" />
-                        <span className="text-[10px] text-white/40 uppercase tracking-wider">Share</span>
-                        <button
-                          type="button"
-                          disabled={sharingSaving}
-                          onClick={() =>
-                            setShareIndexPublicly(
-                              activeRepo.share_index_publicly === false,
-                            )
-                          }
-                          className={`relative w-10 h-5 rounded-full transition-colors duration-200 disabled:opacity-50 ${
-                            activeRepo.share_index_publicly !== false
-                              ? "bg-emerald-600/70"
-                              : "bg-white/15"
-                          }`}
-                          title={
-                            (activeRepo.share_index_publicly !== false)
-                              ? "Click to make index private to scanners of this repo"
-                              : "Click to share index with all scanner users"
-                          }
-                        >
-                          <span
-                            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                              activeRepo.share_index_publicly !== false
-                                ? "translate-x-5"
-                                : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={sharingSaving}
+                        onMouseEnter={() => setShowShareTooltip(true)}
+                        onMouseLeave={() => setShowShareTooltip(false)}
+                        onClick={() => setShareIndexPublicly(activeRepo.share_index_publicly === false)}
+                        className={`relative w-8 h-4 rounded-full transition-colors duration-200 disabled:opacity-50 ${activeRepo.share_index_publicly !== false ? "bg-emerald-500/80" : "bg-white/10"}`}
+                      >
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${activeRepo.share_index_publicly !== false ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </button>
                     </div>
                   )}
-                </div>
-                <div className="flex items-center space-x-3">
+
+                  <div className="w-px h-3 bg-white/10" />
+
                   <div className="flex items-center space-x-2">
                     <span className="text-[11px] text-white/40 uppercase tracking-widest font-medium">Debug Mode</span>
                     <button 
