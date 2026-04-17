@@ -23,6 +23,7 @@ export default function ContextImporter() {
   const [isComplete, setIsComplete] = useState(false);
 
   const estimateTokens = (text: string) => Math.ceil(text.split(/\s+/).length * 1.3);
+  const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 
   const handleProcess = async () => {
     if (!url) {
@@ -43,7 +44,7 @@ export default function ContextImporter() {
       setMemories([]);
 
       // 1. Scrape the URL
-      const scrapeRes = await fetch("/api/v1/memory/scrape", {
+      const scrapeRes = await fetch(`${API_URL}/api/v1/memory/scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -72,7 +73,7 @@ export default function ContextImporter() {
         
         totalInitialTokens += estimateTokens(pair.user_query) + estimateTokens(pair.agent_response);
 
-        const ingestRes = await fetch("/api/v1/memory/ingest", {
+        const ingestRes = await fetch(`${API_URL}/api/v1/memory/ingest`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
