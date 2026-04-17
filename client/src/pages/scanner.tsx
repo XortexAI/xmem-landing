@@ -318,6 +318,14 @@ export default function Scanner() {
                 ]);
               }
 
+              // Clear estimates when both phases are done
+              if (
+                data.phase1_status === "complete" &&
+                (data.phase2_status === "complete" || data.phase2_status === "failed")
+              ) {
+                setEstimates(null);
+              }
+
               return updatedRepo;
             }
             return prev;
@@ -380,7 +388,23 @@ export default function Scanner() {
           </pre>
         );
       }
-      return <span key={index} dangerouslySetInnerHTML={{ __html: part.replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>').replace(/\n/g, '<br/>') }} />;
+      
+      let html = part
+        .replace(/^#### (.*?)$/gm, '<h4 class="text-base font-bold text-white mt-3 mb-1">$1</h4>')
+        .replace(/^### (.*?)$/gm, '<h3 class="text-lg font-bold text-white mt-4 mb-2">$1</h3>')
+        .replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold text-white mt-5 mb-3">$1</h2>')
+        .replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold text-white mt-6 mb-4">$1</h1>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>')
+        .replace(/`([^`\n]+)`/g, '<code class="bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono text-white/90">$1</code>')
+        .replace(/^[\*-] (.*?)$/gm, '<li class="ml-4 list-disc mt-1">$1</li>')
+        .replace(/\n/g, '<br/>')
+        .replace(/<\/h1><br\/>/g, '</h1>')
+        .replace(/<\/h2><br\/>/g, '</h2>')
+        .replace(/<\/h3><br\/>/g, '</h3>')
+        .replace(/<\/h4><br\/>/g, '</h4>')
+        .replace(/<\/li><br\/>/g, '</li>');
+
+      return <span key={index} className="text-white/80 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />;
     });
   };
 
@@ -433,7 +457,7 @@ export default function Scanner() {
       setGithubUrl("");
       setPat("");
       setShowPat(false);
-      setEstimates(null);
+      // Keep estimates visible during scan — cleared when both phases complete
 
       if (data.reused) {
         setMessages([
@@ -783,7 +807,7 @@ export default function Scanner() {
             } else if (chunk.type === "tool_calls") {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantId ? { ...m, toolCalls: chunk.tools } : m
+                  m.id === assistantId ? { ...m, toolCalls: [...(m.toolCalls || []), ...chunk.tools] } : m
                 )
               );
             } else if (chunk.type === "chunk") {
@@ -1011,39 +1035,7 @@ export default function Scanner() {
               <p className="mt-2 text-xs text-white/50">{inputError}</p>
             )}
 
-            {estimates && (
-              <div
-                className="mt-3 rounded-lg p-3 space-y-1.5"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                }}
-              >
-                <p className="text-[10px] text-white/35 leading-snug">
-                  {estimates.estimate_disclaimer}
-                </p>
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-white/45">
-                  <span>Phase 1 (est.)</span>
-                  <span className="text-white/60 text-right">
-                    ~{estimates.estimated_phase1_seconds}s
-                  </span>
-                  <span>Embedding tokens (est.)</span>
-                  <span className="text-white/60 text-right">
-                    ~{estimates.estimated_embedding_tokens.toLocaleString()}
-                  </span>
-                  <span>Phase 2 LLM tokens (est.)</span>
-                  <span className="text-white/60 text-right">
-                    ~{estimates.estimated_phase2_llm_tokens.toLocaleString()}
-                  </span>
-                  <span>Cost (est.)</span>
-                  <span className="text-white/60 text-right">
-                    {estimates.estimated_cost_usd != null
-                      ? `~$${estimates.estimated_cost_usd.toFixed(4)}`
-                      : "—"}
-                  </span>
-                </div>
-              </div>
-            )}
+
           </form>
 
           {/* Repositories */}
@@ -1276,11 +1268,30 @@ export default function Scanner() {
                <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                  {activeRepo.phase1_status !== "complete" ? "Indexing Repository" : "Enriching via LLM"}
                </h2>
-               <p className="text-sm text-white/40 mb-10 max-w-md text-center leading-relaxed">
+               <p className="text-sm text-white/40 mb-4 max-w-md text-center leading-relaxed">
                  {activeRepo.phase1_status !== "complete" 
                    ? "Parsing ASTs, generating code embeddings, and extracting symbol definitions." 
                    : "Generating AI-powered summaries for all codebase files and symbols."}
                </p>
+
+               {/* Scan Estimates Panel */}
+               {estimates && (
+                 <div
+                   className="w-full max-w-md rounded-xl p-5 mb-6 border border-white/5 shadow-2xl"
+                   style={{ background: "rgba(255,255,255,0.02)" }}
+                 >
+                   <div className="text-xs text-white/30 uppercase tracking-widest mb-4 pb-3 border-b border-white/5">Scan Estimates</div>
+                   <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                     <span className="text-white/40">Phase 1 (est.)</span>
+                     <span className="text-white/60 text-right font-mono">~{estimates.estimated_phase1_seconds}s</span>
+                     <span className="text-white/40">Embedding tokens</span>
+                     <span className="text-white/60 text-right font-mono">~{estimates.estimated_embedding_tokens.toLocaleString()}</span>
+                     <span className="text-white/40">Phase 2 LLM tokens</span>
+                     <span className="text-white/60 text-right font-mono">~{estimates.estimated_phase2_llm_tokens.toLocaleString()}</span>
+                   </div>
+                   <p className="text-[10px] text-white/25 mt-3 leading-snug">{estimates.estimate_disclaimer}</p>
+                 </div>
+               )}
                
                {activeRepo.phase1_status !== "complete" ? (
                  <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
@@ -1357,6 +1368,21 @@ export default function Scanner() {
                          />
                        </div>
                      )}
+                     <div className="flex justify-between items-center group">
+                       <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Directories Enriched</span>
+                       <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                         {activeRepo.phase2_stats?.directories_enriched || 0}
+                         {activeRepo.phase2_stats?.total_directories_to_enrich ? ` / ${activeRepo.phase2_stats.total_directories_to_enrich}` : ''}
+                       </span>
+                     </div>
+                     {activeRepo.phase2_stats?.total_directories_to_enrich && (
+                       <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                         <div 
+                           className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                           style={{ width: `${Math.min(100, Math.round(((activeRepo.phase2_stats?.directories_enriched || 0) / activeRepo.phase2_stats.total_directories_to_enrich) * 100))}%` }}
+                         />
+                       </div>
+                     )}
                    </div>
                  </div>
                )}
@@ -1382,8 +1408,8 @@ export default function Scanner() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
-                  {/* Share Toggle */}
-                  {activeRepo.phase1_status === "complete" && (
+                  {/* Share Toggle - Only for personal catalog */}
+                  {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
                     <div className="flex items-center space-x-2 relative">
                       <span
                         onMouseEnter={() => setShowShareTooltip(true)}
@@ -1424,7 +1450,9 @@ export default function Scanner() {
                     </div>
                   )}
 
-                  <div className="w-px h-3 bg-white/10" />
+                  {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
+                    <div className="w-px h-3 bg-white/10" />
+                  )}
 
                   <div className="flex items-center space-x-2">
                     <span className="text-[11px] text-white/40 uppercase tracking-widest font-medium">Debug Mode</span>
