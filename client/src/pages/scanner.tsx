@@ -12,6 +12,7 @@ import {
   Globe,
   Users,
   Star,
+  Copy,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
@@ -161,6 +162,7 @@ export default function Scanner() {
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
   const [repoSearch, setRepoSearch] = useState("");
+  const [showShareTooltip, setShowShareTooltip] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -317,6 +319,14 @@ export default function Scanner() {
                 ]);
               }
 
+              // Clear estimates when both phases are done
+              if (
+                data.phase1_status === "complete" &&
+                (data.phase2_status === "complete" || data.phase2_status === "failed")
+              ) {
+                setEstimates(null);
+              }
+
               return updatedRepo;
             }
             return prev;
@@ -379,7 +389,36 @@ export default function Scanner() {
           </pre>
         );
       }
-      return <span key={index} dangerouslySetInnerHTML={{ __html: part.replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>').replace(/\n/g, '<br/>') }} />;
+      
+      let html = part
+        .replace(/^#### (.*?)$/gm, '<h4 class="text-base font-bold text-white mt-3 mb-1">$1</h4>')
+        .replace(/^### (.*?)$/gm, '<h3 class="text-lg font-bold text-white mt-4 mb-2">$1</h3>')
+        .replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold text-white mt-5 mb-3">$1</h2>')
+        .replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold text-white mt-6 mb-4">$1</h1>')
+        .replace(/^---+\s*$/gm, '<hr class="border-white/10 my-6" />')
+        // table row parsing
+        .replace(/^\|(.*?)\| ?$/gm, (match, p1) => {
+          if (p1.replace(/[-:\s|]/g, '').length === 0) return '';
+          const cells = p1.split('|').map((c: string) => `<td class="border-b border-white/5 bg-white/[0.01] px-4 py-2.5 text-white/80 whitespace-normal align-top leading-relaxed">${c.trim()}</td>`).join('');
+          return `<tr class="hover:bg-white/[0.03] transition-colors">${cells}</tr>`;
+        })
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-medium text-white">$1</strong>')
+        .replace(/`([^`\n]+)`/g, '<code class="bg-white/10 px-1.5 py-0.5 rounded text-[13px] font-mono text-white/90">$1</code>')
+        .replace(/^[\*-] (.*?)$/gm, '<li class="ml-4 list-disc mt-1">$1</li>')
+        .replace(/\n/g, '<br/>')
+        .replace(/<\/h1><br\/>/g, '</h1>')
+        .replace(/<\/h2><br\/>/g, '</h2>')
+        .replace(/<\/h3><br\/>/g, '</h3>')
+        .replace(/<\/h4><br\/>/g, '</h4>')
+        .replace(/<hr class="border-white\/10 my-6" \/><br\/>/g, '<hr class="border-white/10 my-6" />')
+        .replace(/<\/li><br\/>/g, '</li>')
+        // aggregate table rows into a full table
+        .replace(/(<tr class="hover:bg-white\/\[0\.03\] transition-colors">.*?<\/tr>(?:<br\/>)*)+/g, (match) => {
+          const cleanMatch = match.replace(/<br\/>/g, '');
+          return `<div class="rounded-xl overflow-x-auto border border-white/10 my-6 bg-black/40"><table class="w-full text-left text-sm border-collapse"><tbody>${cleanMatch}</tbody></table></div>`;
+        });
+
+      return <span key={index} className="text-white/80 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />;
     });
   };
 
@@ -432,7 +471,7 @@ export default function Scanner() {
       setGithubUrl("");
       setPat("");
       setShowPat(false);
-      setEstimates(null);
+      // Keep estimates visible during scan — cleared when both phases complete
 
       if (data.reused) {
         setMessages([
@@ -782,7 +821,7 @@ export default function Scanner() {
             } else if (chunk.type === "tool_calls") {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantId ? { ...m, toolCalls: chunk.tools } : m
+                  m.id === assistantId ? { ...m, toolCalls: [...(m.toolCalls || []), ...chunk.tools] } : m
                 )
               );
             } else if (chunk.type === "chunk") {
@@ -1010,39 +1049,7 @@ export default function Scanner() {
               <p className="mt-2 text-xs text-white/50">{inputError}</p>
             )}
 
-            {estimates && (
-              <div
-                className="mt-3 rounded-lg p-3 space-y-1.5"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                }}
-              >
-                <p className="text-[10px] text-white/35 leading-snug">
-                  {estimates.estimate_disclaimer}
-                </p>
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-white/45">
-                  <span>Phase 1 (est.)</span>
-                  <span className="text-white/60 text-right">
-                    ~{estimates.estimated_phase1_seconds}s
-                  </span>
-                  <span>Embedding tokens (est.)</span>
-                  <span className="text-white/60 text-right">
-                    ~{estimates.estimated_embedding_tokens.toLocaleString()}
-                  </span>
-                  <span>Phase 2 LLM tokens (est.)</span>
-                  <span className="text-white/60 text-right">
-                    ~{estimates.estimated_phase2_llm_tokens.toLocaleString()}
-                  </span>
-                  <span>Cost (est.)</span>
-                  <span className="text-white/60 text-right">
-                    {estimates.estimated_cost_usd != null
-                      ? `~$${estimates.estimated_cost_usd.toFixed(4)}`
-                      : "—"}
-                  </span>
-                </div>
-              </div>
-            )}
+
           </form>
 
           {/* Repositories */}
@@ -1275,11 +1282,30 @@ export default function Scanner() {
                <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                  {activeRepo.phase1_status !== "complete" ? "Indexing Repository" : "Enriching via LLM"}
                </h2>
-               <p className="text-sm text-white/40 mb-10 max-w-md text-center leading-relaxed">
+               <p className="text-sm text-white/40 mb-4 max-w-md text-center leading-relaxed">
                  {activeRepo.phase1_status !== "complete" 
                    ? "Parsing ASTs, generating code embeddings, and extracting symbol definitions." 
                    : "Generating AI-powered summaries for all codebase files and symbols."}
                </p>
+
+               {/* Scan Estimates Panel */}
+               {estimates && (
+                 <div
+                   className="w-full max-w-md rounded-xl p-5 mb-6 border border-white/5 shadow-2xl"
+                   style={{ background: "rgba(255,255,255,0.02)" }}
+                 >
+                   <div className="text-xs text-white/30 uppercase tracking-widest mb-4 pb-3 border-b border-white/5">Scan Estimates</div>
+                   <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                     <span className="text-white/40">Phase 1 (est.)</span>
+                     <span className="text-white/60 text-right font-mono">~{estimates.estimated_phase1_seconds}s</span>
+                     <span className="text-white/40">Embedding tokens</span>
+                     <span className="text-white/60 text-right font-mono">~{estimates.estimated_embedding_tokens.toLocaleString()}</span>
+                     <span className="text-white/40">Phase 2 LLM tokens</span>
+                     <span className="text-white/60 text-right font-mono">~{estimates.estimated_phase2_llm_tokens.toLocaleString()}</span>
+                   </div>
+                   <p className="text-[10px] text-white/25 mt-3 leading-snug">{estimates.estimate_disclaimer}</p>
+                 </div>
+               )}
                
                {activeRepo.phase1_status !== "complete" ? (
                  <div className="w-full max-w-md bg-white/[0.02] rounded-xl p-6 border border-white/5 shadow-2xl">
@@ -1356,6 +1382,21 @@ export default function Scanner() {
                          />
                        </div>
                      )}
+                     <div className="flex justify-between items-center group">
+                       <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">Directories Enriched</span>
+                       <span className="text-white/90 font-mono text-sm bg-white/5 px-2 py-1 rounded">
+                         {activeRepo.phase2_stats?.directories_enriched || 0}
+                         {activeRepo.phase2_stats?.total_directories_to_enrich ? ` / ${activeRepo.phase2_stats.total_directories_to_enrich}` : ''}
+                       </span>
+                     </div>
+                     {activeRepo.phase2_stats?.total_directories_to_enrich && (
+                       <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 mb-3">
+                         <div 
+                           className="h-full bg-white/40 transition-all duration-500 ease-out" 
+                           style={{ width: `${Math.min(100, Math.round(((activeRepo.phase2_stats?.directories_enriched || 0) / activeRepo.phase2_stats.total_directories_to_enrich) * 100))}%` }}
+                         />
+                       </div>
+                     )}
                    </div>
                  </div>
                )}
@@ -1369,66 +1410,64 @@ export default function Scanner() {
                     <MessageSquare size={16} className="text-blue-400" />
                     <span>XMem Knowledge Graph</span>
                   </h3>
-                  <p className="text-xs text-white/40 mt-1">{activeRepo.org}/{activeRepo.repo}</p>
-                  {activeRepo.phase1_status === "complete" && (
-                    <div
-                      className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg px-3 py-2.5"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                      }}
-                    >
-                      <div className="flex items-start gap-2 min-w-0">
-                        {(activeRepo.share_index_publicly !== false) ? (
-                          <Globe className="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5" />
-                        ) : (
-                          <Lock className="w-4 h-4 text-white/35 shrink-0 mt-0.5" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-[11px] text-white/55 leading-snug">
-                            <span className="text-white/75 font-medium">Community index</span>
-                            {" — "}
-                            {(activeRepo.share_index_publicly !== false)
-                              ? "Anyone can ask questions on this revision without re-scanning (shared catalog)."
-                              : "Only accounts that ran a scan for this repo can query it. Enable sharing to let everyone reuse this index."}
-                          </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-white/40">{activeRepo.org}/{activeRepo.repo}</p>
+                    {activeRepo.phase1_status === "complete" && (
+                      activeRepo.share_index_publicly !== false ? (
+                        <Globe className="w-3 h-3 text-emerald-400/50" />
+                      ) : (
+                        <Lock className="w-3 h-3 text-white/20" />
+                      )
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  {/* Share Toggle - Only for personal catalog */}
+                  {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
+                    <div className="flex items-center space-x-2 relative">
+                      <span
+                        onMouseEnter={() => setShowShareTooltip(true)}
+                        onMouseLeave={() => setShowShareTooltip(false)}
+                        className="text-[10px] text-white/40 uppercase tracking-widest font-bold cursor-default hover:text-white/60 transition-colors"
+                      >
+                        Public index
+                      </span>
+
+                      {showShareTooltip && (
+                        <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-[#111] border border-white/10 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] z-[60] pointer-events-none">
+                          <div className="flex items-start gap-2">
+                            {activeRepo.share_index_publicly !== false ? (
+                              <Globe className="w-3.5 h-3.5 text-emerald-400/70 mt-0.5 shrink-0" />
+                            ) : (
+                              <Lock className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                            )}
+                            <p className="text-[11px] text-white/70 leading-relaxed font-normal normal-case tracking-normal">
+                              {activeRepo.share_index_publicly !== false
+                                ? "Anyone can ask questions or chat with this repository on this revision without re-scanning (shared index catalog)."
+                                : "Only users who have personally scanned this repository can query it. Enable sharing to let others reuse this index and save processing time."}
+                            </p>
+                          </div>
+                          <div className="absolute top-0 right-10 -translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-white/10" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 sm:ml-auto">
-                        <Users className="w-3.5 h-3.5 text-white/30" />
-                        <span className="text-[10px] text-white/40 uppercase tracking-wider">Share</span>
-                        <button
-                          type="button"
-                          disabled={sharingSaving}
-                          onClick={() =>
-                            setShareIndexPublicly(
-                              activeRepo.share_index_publicly === false,
-                            )
-                          }
-                          className={`relative w-10 h-5 rounded-full transition-colors duration-200 disabled:opacity-50 ${
-                            activeRepo.share_index_publicly !== false
-                              ? "bg-emerald-600/70"
-                              : "bg-white/15"
-                          }`}
-                          title={
-                            (activeRepo.share_index_publicly !== false)
-                              ? "Click to make index private to scanners of this repo"
-                              : "Click to share index with all scanner users"
-                          }
-                        >
-                          <span
-                            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                              activeRepo.share_index_publicly !== false
-                                ? "translate-x-5"
-                                : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={sharingSaving}
+                        onMouseEnter={() => setShowShareTooltip(true)}
+                        onMouseLeave={() => setShowShareTooltip(false)}
+                        onClick={() => setShareIndexPublicly(activeRepo.share_index_publicly === false)}
+                        className={`relative w-8 h-4 rounded-full transition-colors duration-200 disabled:opacity-50 ${activeRepo.share_index_publicly !== false ? "bg-emerald-500/80" : "bg-white/10"}`}
+                      >
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${activeRepo.share_index_publicly !== false ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </button>
                     </div>
                   )}
-                </div>
-                <div className="flex items-center space-x-3">
+
+                  {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
+                    <div className="w-px h-3 bg-white/10" />
+                  )}
+
                   <div className="flex items-center space-x-2">
                     <span className="text-[11px] text-white/40 uppercase tracking-widest font-medium">Debug Mode</span>
                     <button 
@@ -1479,6 +1518,18 @@ export default function Scanner() {
                         <div className="text-sm font-light leading-relaxed">
                           {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
                         </div>
+                        
+                        {!isUser && msg.content && (
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              onClick={() => navigator.clipboard.writeText(msg.content)}
+                              className="text-white/20 hover:text-white/60 transition-colors p-1"
+                              title="Copy to clipboard"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                         
                         {debugMode && msg.toolCalls && msg.toolCalls.length > 0 && (
                           <div className="mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2">
