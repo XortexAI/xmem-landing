@@ -44,7 +44,7 @@ export default function ContextImporter() {
       setMemories([]);
 
       // 1. Scrape the URL
-      const scrapeRes = await fetch(`${API_URL}/api/v1/memory/scrape`, {
+      const scrapeRes = await fetch(`${API_URL}/v1/memory/scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -73,7 +73,7 @@ export default function ContextImporter() {
         
         totalInitialTokens += estimateTokens(pair.user_query) + estimateTokens(pair.agent_response);
 
-        const ingestRes = await fetch(`${API_URL}/api/v1/memory/ingest`, {
+        const ingestRes = await fetch(`${API_URL}/v1/memory/ingest`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
