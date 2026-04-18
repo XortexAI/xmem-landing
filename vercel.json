@@ -4,7 +4,6 @@
   "installCommand": "npm install",
   "framework": "vite",
   "build": {
-    "cache":false,
     "env": {
       "NODE_ENV": "production"
     }
