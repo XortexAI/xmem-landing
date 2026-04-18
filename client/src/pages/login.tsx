@@ -27,6 +27,7 @@ interface TokenResponse {
     id: string;
     email: string;
     name: string;
+    username?: string;
     picture?: string;
     created_at?: string;
     last_login?: string;
