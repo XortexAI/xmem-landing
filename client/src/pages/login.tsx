@@ -16,10 +16,8 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 console.log("[Login] VITE_GOOGLE_CLIENT_ID:", GOOGLE_CLIENT_ID ? "Set (hidden)" : "NOT SET");
 console.log("[Login] All env vars:", import.meta.env);
 
-interface GoogleCredentialResponse {
-  credential: string;
-  select_by: string;
-}
+// Use the type from @react-oauth/google
+import type { CredentialResponse } from '@react-oauth/google';
 
 interface TokenResponse {
   access_token: string;
@@ -51,9 +49,15 @@ function LoginContent() {
     return <Redirect to={decodeURIComponent(returnUrl)} />;
   }
 
-  const handleGoogleSuccess = async (credentialResponse: GoogleCredentialResponse) => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setIsLoading(true);
     setError(null);
+
+    if (!credentialResponse.credential) {
+      setError('No credential received from Google');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/auth/google`, {
