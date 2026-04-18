@@ -48,6 +48,21 @@ export function Navbar() {
           />
         </Link>
 
+        <div className="hidden md:flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
+          <Link href="/scanner" className="text-sm text-gray-300 hover:text-white transition-colors">
+            Scanner
+          </Link>
+          <Link href="/context" className="text-sm text-gray-300 hover:text-white transition-colors">
+            Context
+          </Link>
+          <a 
+            href="/docs" 
+            className="text-sm text-gray-300 hover:text-white transition-colors"
+          >
+            Documentation
+          </a>
+        </div>
+
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
             <DropdownMenu>

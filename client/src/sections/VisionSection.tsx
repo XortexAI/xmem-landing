@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Brain, Network, Database, GitMerge, Workflow, Sparkles } from "lucide-react";
+import { Brain, Network, Database, GitMerge, Sparkles, Clock, FileText, Github } from "lucide-react";
 import { RevealSection } from "../components/shared/RevealSection";
 
 export function VisionSection() {
@@ -31,36 +31,36 @@ export function VisionSection() {
             <motion.div 
               animate={{ rotate: 360 }} 
               transition={{ duration: 100, repeat: Infinity, ease: "linear" }}
-              className="absolute w-[280px] h-[280px] md:w-[360px] md:h-[360px] border border-white/5 rounded-full" 
+              className="absolute w-[280px] h-[280px] md:w-[360px] md:h-[360px] border-2 border-white/20 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.05)]" 
             />
             <motion.div 
               animate={{ rotate: -360 }} 
               transition={{ duration: 140, repeat: Infinity, ease: "linear" }}
-              className="absolute w-[400px] h-[400px] md:w-[560px] md:h-[560px] border border-white/10 border-dashed rounded-full" 
+              className="absolute w-[400px] h-[400px] md:w-[560px] md:h-[560px] border-2 border-white/30 border-dashed rounded-full shadow-[0_0_40px_rgba(255,255,255,0.05)]" 
             />
             <motion.div 
               animate={{ rotate: 360 }} 
               transition={{ duration: 200, repeat: Infinity, ease: "linear" }}
-              className="absolute w-[520px] h-[520px] md:w-[760px] md:h-[760px] border border-white/[0.03] rounded-full" 
+              className="absolute w-[520px] h-[520px] md:w-[760px] md:h-[760px] border border-white/20 rounded-full shadow-[0_0_50px_rgba(255,255,255,0.05)]" 
             />
             
             {/* Connecting crosshairs */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-full max-w-4xl h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-              <div className="absolute h-full max-h-[600px] w-[1px] bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+              <div className="w-full max-w-5xl h-[2px] bg-gradient-to-r from-transparent via-white/30 to-transparent shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+              <div className="absolute h-full max-h-[800px] w-[2px] bg-gradient-to-b from-transparent via-white/30 to-transparent shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
             </div>
 
             {/* Pulses on crosshairs */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <motion.div 
                     animate={{ x: ["-400px", "400px"], opacity: [0, 1, 0] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute w-24 h-[1px] bg-gradient-to-r from-transparent via-white/50 to-transparent"
+                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute w-32 h-[3px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_20px_rgba(34,211,238,0.8)]"
                 />
                 <motion.div 
                     animate={{ y: ["-300px", "300px"], opacity: [0, 1, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                    className="absolute h-24 w-[1px] bg-gradient-to-b from-transparent via-white/50 to-transparent"
+                    transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                    className="absolute h-32 w-[3px] bg-gradient-to-b from-transparent via-purple-400 to-transparent shadow-[0_0_20px_rgba(192,132,252,0.8)]"
                 />
             </div>
 
@@ -83,17 +83,45 @@ export function VisionSection() {
                  transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
                  className="w-full h-full relative"
                >
-                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/10 flex items-center justify-center backdrop-blur-md">
-                   <Workflow className="w-6 h-6 text-white/60" />
+                 {/* 0 deg - GPT */}
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/80">
+                     <path d="M12 2a10 10 0 1 0 0 20 4 4 0 1 1 0-8 6 6 0 1 1 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6z" />
+                   </svg>
                  </div>
-                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/10 flex items-center justify-center backdrop-blur-md">
-                   <Brain className="w-6 h-6 text-white/60" />
+                 {/* 45 deg - Claude */}
+                 <div className="absolute top-[14.6%] left-[85.4%] -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-white/80">
+                     <path d="M12 2.5a.75.75 0 0 1 .72.54l1.32 4.62 4.62 1.32a.75.75 0 0 1 0 1.44l-4.62 1.32-1.32 4.62a.75.75 0 0 1-1.44 0l-1.32-4.62-4.62-1.32a.75.75 0 0 1 0-1.44l4.62-1.32 1.32-4.62A.75.75 0 0 1 12 2.5z"/>
+                   </svg>
                  </div>
-                 <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/10 flex items-center justify-center backdrop-blur-md">
-                   <Network className="w-6 h-6 text-white/60" />
+                 {/* 90 deg - Gemini */}
+                 <div className="absolute top-1/2 left-full -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-white/80">
+                     <path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z"/>
+                   </svg>
                  </div>
-                 <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/10 flex items-center justify-center backdrop-blur-md">
-                   <GitMerge className="w-6 h-6 text-white/60" />
+                 {/* 135 deg - Cursor */}
+                 <div className="absolute top-[85.4%] left-[85.4%] -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/80">
+                     <path d="M4 4l7.07 17 2.51-7.39L21 11.07z" />
+                   </svg>
+                 </div>
+                 {/* 180 deg - Temporal */}
+                 <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <Clock className="w-6 h-6 text-white/80" />
+                 </div>
+                 {/* 225 deg - PDFs */}
+                 <div className="absolute top-[85.4%] left-[14.6%] -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <FileText className="w-6 h-6 text-white/80" />
+                 </div>
+                 {/* 270 deg - GitHub */}
+                 <div className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <Github className="w-6 h-6 text-white/80" />
+                 </div>
+                 {/* 315 deg - Code/Agent */}
+                 <div className="absolute top-[14.6%] left-[14.6%] -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-[#0a0a0a] border border-white/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                   <Sparkles className="w-6 h-6 text-white/80" />
                  </div>
                </motion.div>
             </div>

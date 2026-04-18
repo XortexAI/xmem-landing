@@ -308,10 +308,22 @@ export default function Dashboard() {
                   <div>
                     <h3 className="font-semibold text-white">{user?.name}</h3>
                     <p className="text-sm text-gray-400">{user?.email}</p>
+                    {user?.username && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-xs text-gray-500">@</span>
+                        <span className="text-xs font-mono text-blue-400">{user.username}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="pt-4 border-t border-gray-800 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Username</span>
+                    <span className="text-white font-mono">
+                      {user?.username ? `@${user.username}` : 'Not set'}
+                    </span>
+                  </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Member since</span>
                     <span className="text-white">
@@ -437,41 +449,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Usage Instructions */}
-          <Card className="mt-6 bg-[#111] border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-lg text-white">Using Your API Key</CardTitle>
-              <CardDescription className="text-gray-400">
-                Include your API key in the Authorization header of your requests
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-[#0a0a0a] rounded-lg p-4 border border-gray-800">
-                <code className="text-sm text-green-400 block">
-                  Authorization: Bearer {'<'}your-api-key{'}'}
-                </code>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                <Button
-                  variant="outline"
-                  className="border-gray-700 text-gray-300 hover:bg-gray-800"
-                  onClick={() => setLocation('/scanner')}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Try Scanner
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-gray-700 text-gray-300 hover:bg-gray-800"
-                  onClick={() => setLocation('/context')}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Try Context Import
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 

@@ -268,7 +268,11 @@ function SplitBrain({ progress }: { progress: number }) {
   const leftLineMatRef = useRef<THREE.LineBasicMaterial>(null);
   const rightLineMatRef = useRef<THREE.LineBasicMaterial>(null);
   const crossLineMatRef = useRef<THREE.LineBasicMaterial>(null);
-  const { mouse } = useThree();
+  const { mouse, viewport } = useThree();
+  
+  // Scale down significantly for mobile devices to prevent it crossing the screen height
+  const isMobile = viewport.width < 5;
+  const brainScale = isMobile ? 0.65 : 1.0;
 
   const data = useMemo(() => generateBrain(), []);
 
@@ -332,7 +336,7 @@ function SplitBrain({ progress }: { progress: number }) {
   });
 
   return (
-    <group ref={groupRef} scale={1.8}>
+    <group ref={groupRef} scale={brainScale}>
       {/* Left hemisphere */}
       <group ref={leftRef}>
         {data.leftPts.map((p, i) => (

@@ -7,6 +7,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  username?: string;
   picture?: string;
   created_at?: string;
   last_login?: string;
@@ -17,9 +18,11 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   token: string | null;
+  hasUsername: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  setUsername: (username: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -120,14 +123,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [token, refreshUser]);
 
+  const setUsername = useCallback(async (username: string) => {
+    if (!token || !user) return false;
+    try {
+      const response = await fetch(`${API_URL}/auth/set-username`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const updatedUser = { ...user, username: data.username };
+        setUser(updatedUser);
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to set username:', err);
+      return false;
+    }
+  }, [token, user]);
+
+  const hasUsername = !!user?.username;
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user && !!token,
     isLoading,
     token,
+    hasUsername,
     login,
     logout,
     refreshUser,
+    setUsername,
   };
 
   return (

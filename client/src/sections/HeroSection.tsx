@@ -39,7 +39,7 @@ export function HeroSection() {
           }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
-          INFRASTRUCTURE FOR AUTONOMOUS AI
+          Memory as a Service
         </motion.div>
 
         <motion.h1

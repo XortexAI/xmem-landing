@@ -10,12 +10,25 @@ import {
   MessageSquare,
   Search,
   Globe,
-  Users,
   Star,
   Copy,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
+
+function authBearerHeaders(token: string | null): HeadersInit {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
+function authJsonHeaders(token: string | null): HeadersInit {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
 
 interface RepoEntry {
   org: string;
@@ -63,14 +76,8 @@ function StatusDot({ status }: { status: string }) {
   return <Circle className="w-2 h-2 text-white/20" />;
 }
 
-function UsernameScreen({ onSubmit }: { onSubmit: (name: string) => void }) {
-  const [value, setValue] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = value.trim();
-    if (trimmed) onSubmit(trimmed);
-  };
+function LoginPromptScreen() {
+  const loginHref = `/login?returnUrl=${encodeURIComponent("/scanner")}`;
 
   return (
     <div
@@ -93,42 +100,31 @@ function UsernameScreen({ onSubmit }: { onSubmit: (name: string) => void }) {
             Scanner Dashboard
           </h1>
           <p className="text-white/40 mt-3 text-sm">
-            Index and explore any GitHub repository
+            Sign in to index repositories and chat with your codebase using your account.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div
-            className="rounded-xl p-8"
+        <div
+          className="rounded-xl p-8 text-center"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <a
+            href={loginHref}
+            className="inline-flex w-full justify-center px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200"
             style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "white",
+              color: "black",
             }}
           >
-            <label className="block text-xs text-white/50 uppercase tracking-widest mb-3">
-              Username
-            </label>
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Enter your username"
-              autoFocus
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/25 focus:outline-none focus:border-white/30 transition-colors text-sm"
-            />
-            <button
-              type="submit"
-              disabled={!value.trim()}
-              className="w-full mt-4 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-              style={{
-                background: value.trim() ? "white" : "rgba(255,255,255,0.1)",
-                color: value.trim() ? "black" : "rgba(255,255,255,0.3)",
-              }}
-            >
-              Continue
-            </button>
-          </div>
-        </form>
+            Sign in
+          </a>
+          <p className="mt-4 text-[11px] text-white/35 leading-relaxed">
+            The scanner uses your authenticated session and API access. Anonymous display names are no longer supported here.
+          </p>
+        </div>
 
         <a
           href="/"
@@ -143,12 +139,10 @@ function UsernameScreen({ onSubmit }: { onSubmit: (name: string) => void }) {
 }
 
 export default function Scanner() {
-  const [username, setUsername] = useState(
-    () => localStorage.getItem("xmem_username") || "",
-  );
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => !!localStorage.getItem("xmem_username"),
-  );
+  const { user, token, logout: authLogout, isAuthenticated, isLoading } =
+    useAuth();
+
+  const username = user?.username ?? user?.name ?? "";
 
   const [githubUrl, setGithubUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -197,13 +191,14 @@ export default function Scanner() {
   // ── Load persisted repos from API ─────────────────────────────────
 
   useEffect(() => {
-    if (!isLoggedIn || !username.trim()) return;
+    if (!isAuthenticated || !token || !username.trim()) return;
 
     let cancelled = false;
     (async () => {
       try {
         const resp = await fetch(
           `${API_URL}/v1/scanner/repos?username=${encodeURIComponent(username)}`,
+          { headers: authBearerHeaders(token) },
         );
         const data = await resp.json();
         if (cancelled || data.status !== "ok" || !Array.isArray(data.repos)) return;
@@ -225,12 +220,13 @@ export default function Scanner() {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, username]);
+  }, [isAuthenticated, token, username]);
 
   // ── Community catalog ───────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isLoggedIn || !username.trim() || scannerTab !== "community") return;
+    if (!isAuthenticated || !token || !username.trim() || scannerTab !== "community")
+      return;
 
     let cancelled = false;
     (async () => {
@@ -243,7 +239,9 @@ export default function Scanner() {
           limit: "80",
           offset: "0",
         });
-        const resp = await fetch(`${API_URL}/v1/scanner/community?${params}`);
+        const resp = await fetch(`${API_URL}/v1/scanner/community?${params}`, {
+          headers: authBearerHeaders(token),
+        });
         const data = await resp.json();
         if (cancelled || data.status !== "ok") return;
         setCommunityItems(Array.isArray(data.items) ? data.items : []);
@@ -258,18 +256,19 @@ export default function Scanner() {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, username, scannerTab, communitySearch, communitySort]);
+  }, [isAuthenticated, token, username, scannerTab, communitySearch, communitySort]);
 
   // ── Poll in-progress scans (catalog-aware) ──────────────────────────
 
   useEffect(() => {
-    if (!username || indexingRepos.length === 0) return;
+    if (!token || !username || indexingRepos.length === 0) return;
 
     const interval = setInterval(async () => {
       for (const repo of indexingRepos) {
         try {
           const resp = await fetch(
             `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(repo.org)}&repo=${encodeURIComponent(repo.repo)}`,
+            { headers: authBearerHeaders(token) },
           );
           const data = await resp.json();
 
@@ -338,21 +337,7 @@ export default function Scanner() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [indexingRepos, username]);
-
-  useEffect(() => {
-    if (!username) return;
-    const fetchRepos = async () => {
-      try {
-        const res = await fetch(`${API_URL}/v1/scanner/repos?username=${encodeURIComponent(username)}`);
-        const data = await res.json();
-        if (data.repos) {
-          setRepos(data.repos);
-        }
-      } catch {}
-    };
-    fetchRepos();
-  }, [username]);
+  }, [indexingRepos, username, token]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -360,16 +345,8 @@ export default function Scanner() {
 
   // ── Auth ─────────────────────────────────────────────────────────────
 
-  const handleLogin = (name: string) => {
-    setUsername(name);
-    setIsLoggedIn(true);
-    localStorage.setItem("xmem_username", name);
-  };
-
   const handleLogout = () => {
-    setUsername("");
-    setIsLoggedIn(false);
-    localStorage.removeItem("xmem_username");
+    authLogout();
     setRepos([]);
     setActiveRepo(null);
     setMessages([]);
@@ -432,7 +409,7 @@ export default function Scanner() {
     try {
       const resp = await fetch(`${API_URL}/v1/scanner/scan`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify({
           github_url: githubUrl.trim(),
           username,
@@ -528,7 +505,7 @@ export default function Scanner() {
     try {
       const resp = await fetch(`${API_URL}/v1/scanner/validate-url`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify({
           github_url: githubUrl.trim(),
           pat: pat.trim(),
@@ -575,7 +552,7 @@ export default function Scanner() {
     try {
       const resp = await fetch(`${API_URL}/v1/scanner/index-visibility`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify({
           username,
           org_id: activeRepo.org,
@@ -622,6 +599,7 @@ export default function Scanner() {
     try {
       const resp = await fetch(
         `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(org)}&repo=${encodeURIComponent(repoName)}`,
+        { headers: authBearerHeaders(token) },
       );
       const data = await resp.json();
       const entry: RepoEntry = {
@@ -675,7 +653,7 @@ export default function Scanner() {
     try {
       const resp = await fetch(`${API_URL}/v1/scanner/community/star`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify({
           username,
           org_id: org,
@@ -757,7 +735,7 @@ export default function Scanner() {
     try {
       const resp = await fetch(`${API_URL}/v1/scanner/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify({
           org_id: activeRepo.org,
           repo: activeRepo.repo,
@@ -902,8 +880,19 @@ export default function Scanner() {
 
   // ── Render ───────────────────────────────────────────────────────────
 
-  if (!isLoggedIn) {
-    return <UsernameScreen onSubmit={handleLogin} />;
+  if (isLoading) {
+    return (
+      <div
+        className="dark min-h-screen flex items-center justify-center"
+        style={{ background: "#080808" }}
+      >
+        <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !token) {
+    return <LoginPromptScreen />;
   }
 
   const canChat = activeRepo?.phase1_status === "complete" && 
@@ -930,7 +919,9 @@ export default function Scanner() {
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-white/50">{username}</span>
+          <span className="text-sm text-white/50">
+            {user?.username ?? user?.name}
+          </span>
           <button
             onClick={handleLogout}
             className="text-xs text-white/30 hover:text-white/60 transition-colors"

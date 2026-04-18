@@ -144,17 +144,17 @@ curl "https://api.xmem.dev/v1/recall?q=auth+refactor" \\
             {[
               {
                 icon: Code2,
-                title: "10+ SDKs",
-                desc: "TypeScript, Python, Go, Rust, and more",
+                title: "3 SDKs",
+                desc: "TypeScript, Python, Go",
               },
               {
                 icon: Terminal,
-                title: "Powerful CLI",
-                desc: "Full control from the command line",
+                title: "Extension",
+                desc: "Full control from the Extension",
               },
               {
                 icon: Zap,
-                title: "REST & gRPC",
+                title: "REST",
                 desc: "Works with any language or runtime",
               },
             ].map((f, i) => (

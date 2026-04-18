@@ -66,22 +66,7 @@ export function CTASection() {
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-8">
-            {[
-              "SOC 2 Type II",
-              "GDPR Compliant",
-              "HIPAA Ready",
-              "99.99% SLA",
-            ].map((badge) => (
-              <div
-                key={badge}
-                className="text-xs text-white/30 flex items-center gap-2"
-              >
-                <Shield className="w-3 h-3" />
-                {badge}
-              </div>
-            ))}
-          </div>
+          
         </RevealSection>
       </div>
     </section>

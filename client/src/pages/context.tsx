@@ -1,16 +1,18 @@
 import { useState } from "react";
+import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Navbar } from "@/sections/Navbar";
-import { Brain, Link as LinkIcon, Download, User, Activity } from "lucide-react";
+import { Link as LinkIcon, Download, User, Activity, Loader2 } from "lucide-react";
 
 export default function ContextImporter() {
   const { toast } = useToast();
+  const { user, token, isAuthenticated, isLoading } = useAuth();
   const [url, setUrl] = useState("");
-  const [username, setUsername] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
@@ -25,7 +27,23 @@ export default function ContextImporter() {
   const estimateTokens = (text: string) => Math.ceil(text.split(/\s+/).length * 1.3);
   const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 
+  const authJsonHeaders = (accessToken: string): HeadersInit => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  });
+
   const handleProcess = async () => {
+    if (!token || !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to import context.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const userId = user.username ?? user.id;
+
     if (!url) {
       toast({
         title: "URL Required",
@@ -43,10 +61,9 @@ export default function ContextImporter() {
       setStats(null);
       setMemories([]);
 
-      // 1. Scrape the URL
       const scrapeRes = await fetch(`${API_URL}/v1/memory/scrape`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify({ url }),
       });
 
@@ -64,37 +81,34 @@ export default function ContextImporter() {
       let totalInitialTokens = 0;
       let totalMemoriesTokens = 0;
       const allMemories: string[] = [];
-      const effectiveUserId = username.trim() || `temp_user_${Math.random().toString(36).substring(7)}`;
 
-      // 2. Sequential Ingestion Loop
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i];
         setCurrentStep(`Processing message pair ${i + 1} of ${pairs.length}...`);
-        
+
         totalInitialTokens += estimateTokens(pair.user_query) + estimateTokens(pair.agent_response);
 
         const ingestRes = await fetch(`${API_URL}/v1/memory/ingest`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(token),
           body: JSON.stringify({
             user_query: pair.user_query,
             agent_response: pair.agent_response,
-            user_id: effectiveUserId,
+            user_id: userId,
             effort_level: "low",
           }),
         });
 
         if (ingestRes.ok) {
           const ingestData = await ingestRes.json();
-          
-          // Collect memory operations content
+
           const profileOps = ingestData.data?.profile?.operations || [];
           const temporalOps = ingestData.data?.temporal?.operations || [];
           const summaryOps = ingestData.data?.summary?.operations || [];
-          
+
           const ops = [...profileOps, ...temporalOps, ...summaryOps];
-          
-          ops.forEach(op => {
+
+          ops.forEach((op) => {
             if (op.content) {
               allMemories.push(op.content);
               totalMemoriesTokens += estimateTokens(op.content);
@@ -109,7 +123,7 @@ export default function ContextImporter() {
       setStats({
         initialTokens: totalInitialTokens,
         tokensAfter: totalMemoriesTokens,
-        accuracy: 98, // Mock placeholder for accuracy
+        accuracy: 98,
       });
       setIsComplete(true);
       setCurrentStep("Processing complete!");
@@ -117,13 +131,13 @@ export default function ContextImporter() {
 
       toast({
         title: "Success",
-        description: username ? "Memories synced successfully!" : "Memories generated successfully!",
+        description: "Memories synced successfully!",
       });
-
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An error occurred while processing the context.";
       toast({
         title: "Processing Failed",
-        description: error.message || "An error occurred while processing the context.",
+        description: message,
         variant: "destructive",
       });
       setCurrentStep("Processing failed.");
@@ -134,32 +148,65 @@ export default function ContextImporter() {
 
   const handleDownload = () => {
     if (memories.length === 0) return;
-    
+
     const textContent = memories.join("\n\n");
     const blob = new Blob([textContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    
+    const downloadUrl = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `xmem-context-${new Date().toISOString().split('T')[0]}.txt`;
+    a.href = downloadUrl;
+    a.download = `xmem-context-${new Date().toISOString().split("T")[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(downloadUrl);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <Navbar />
+        <Loader2 className="h-10 w-10 animate-spin text-primary" aria-label="Loading" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-black text-white selection:bg-primary/30">
+        <Navbar />
+        <main className="container mx-auto px-4 pt-32 pb-16 max-w-lg">
+          <Card className="bg-white/5 border-white/10 backdrop-blur-xl">
+            <CardHeader>
+              <CardTitle className="text-xl">Sign in required</CardTitle>
+              <CardDescription className="text-white/60">
+                Context import syncs memories to your XMem profile. Sign in to continue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full" size="lg">
+                <Link href="/login">Go to login</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-primary/30">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 pt-32 pb-16 max-w-4xl">
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-            Context Importer
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Context Importer</h1>
           <p className="text-lg text-white/60 max-w-2xl mx-auto">
             Convert long chat threads from ChatGPT, Claude, and Gemini into compressed, usable memories.
           </p>
+          {user?.username && (
+            <p className="text-sm text-white/40 mt-3 font-mono">@{user.username}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -186,24 +233,8 @@ export default function ContextImporter() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-white/80 flex items-center gap-2">
-                    Username (Optional)
-                  </label>
-                  <Input
-                    placeholder="e.g. john_doe"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="bg-black/50 border-white/20 focus:border-primary text-white"
-                    disabled={isProcessing}
-                  />
-                  <p className="text-xs text-white/40">
-                    If provided, memories will be synced directly to this profile. Otherwise, you can download them.
-                  </p>
-                </div>
-
-                <Button 
-                  className="w-full mt-4" 
+                <Button
+                  className="w-full mt-4"
                   size="lg"
                   onClick={handleProcess}
                   disabled={isProcessing || !url}
@@ -213,15 +244,10 @@ export default function ContextImporter() {
                       <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                       Processing...
                     </span>
-                  ) : username ? (
+                  ) : (
                     <span className="flex items-center gap-2">
                       <User className="w-4 h-4" />
                       Sync Memories
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Brain className="w-4 h-4" />
-                      Generate Memories
                     </span>
                   )}
                 </Button>
@@ -269,10 +295,10 @@ export default function ContextImporter() {
                   </div>
                 </div>
 
-                {isComplete && !username && memories.length > 0 && (
+                {isComplete && memories.length > 0 && (
                   <div className="pt-4 border-t border-white/10">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full bg-white/5 hover:bg-white/10 text-white border-white/20"
                       onClick={handleDownload}
                     >

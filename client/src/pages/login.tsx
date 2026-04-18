@@ -80,8 +80,13 @@ function LoginContent() {
       // Store auth data
       login(data.access_token, data.user);
 
-      // Redirect to the return URL or dashboard
-      setLocation(decodeURIComponent(returnUrl));
+      // Redirect to set-username if they don't have one yet
+      if (!data.user.username) {
+        setLocation('/set-username');
+      } else {
+        // Redirect to the return URL or dashboard
+        setLocation(decodeURIComponent(returnUrl));
+      }
     } catch (err) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.');

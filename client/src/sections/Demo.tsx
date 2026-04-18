@@ -14,8 +14,6 @@ export function DemoSection() {
   const videoOpacity = useTransform(scrollYProgress, [0, 0.3], [0.45, 1]);
   const videoBlur = useTransform(scrollYProgress, [0, 0.35], [18, 0]);
   const frameY = useTransform(scrollYProgress, [0, 0.45], [80, 0]);
-  const textOpacity = useTransform(scrollYProgress, [0.2, 0.55], [0, 1]);
-  const textY = useTransform(scrollYProgress, [0.2, 0.55], [36, 0]);
 
   return (
     <section
@@ -41,8 +39,8 @@ export function DemoSection() {
           </div>
         </div>
 
-        <div className="grid gap-10 lg:min-h-[120vh] lg:grid-cols-[1.4fr_0.8fr] lg:items-start">
-          <div className="lg:sticky lg:top-[12vh]">
+        <div className="grid gap-10 lg:grid-cols-[1.4fr_0.8fr] lg:items-center">
+          <div className="lg:sticky lg:top-[20vh]">
             <motion.div
               style={{
                 scale: videoScale,
@@ -85,12 +83,11 @@ export function DemoSection() {
             </motion.div>
           </div>
 
-          <div className="flex items-center lg:min-h-[100vh]">
-            <motion.div
-              style={{ opacity: textOpacity, y: textY }}
-              className="w-full rounded-[28px] border border-white/10 bg-white/[0.025] p-8 backdrop-blur-sm md:p-10"
+          <div className="flex items-center lg:min-h-0">
+            <div
+              className="w-full rounded-[28px] border border-white/10 bg-white/5 p-8 backdrop-blur-sm md:p-10"
             >
-              <div className="text-xs uppercase tracking-[0.28em] text-white/35">
+              <div className="text-xs uppercase tracking-[0.28em] text-white/50">
                 Why it matters
               </div>
               <h3
@@ -99,20 +96,20 @@ export function DemoSection() {
               >
                 Keep your memory unified and use it anywhere.
               </h3>
-              <p className="mt-6 text-lg leading-relaxed text-white/42">
+              <p className="mt-6 text-lg leading-relaxed text-white/60">
                 Portability should not be a second-class problem. Xmem keeps
                 memory structured, portable, and available across runtimes,
                 tools, and agent workflows.
               </p>
-              <div className="mt-8 space-y-3 text-sm text-white/34">
-                <div className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3">
+              <div className="mt-8 space-y-3 text-sm text-white/60">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                   One memory layer across local tools, cloud agents, and production systems.
                 </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                   The same context follows the agent instead of being rebuilt every time.
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>

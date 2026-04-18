@@ -292,7 +292,7 @@ export function ProblemSection() {
               className="mt-8 flex items-center justify-between gap-4 rounded-[24px] border px-5 py-4 text-sm text-white/42"
               transition={{ duration: 0.2 }}
             >
-              <div className="uppercase tracking-[0.2em] text-white/28">
+              <div className="uppercase tracking-[0.2em] text-white/50">
                 Failure point
               </div>
               <div className="text-right md:text-left">
@@ -318,7 +318,7 @@ export function ProblemSection() {
               >
                 <div className="mb-6 flex items-center justify-between">
                   <div
-                    className="text-3xl font-semibold text-white/22"
+                    className="text-3xl font-semibold text-white/50"
                     style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                   >
                     {problem.icon}
