@@ -20,6 +20,7 @@ import {
   User,
   Crown,
   Code,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -138,6 +139,7 @@ export default function Enterprise() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAnnotationPanel, setShowAnnotationPanel] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "annotations" | "team">("chat");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Form state
   const [newProjectName, setNewProjectName] = useState("");
@@ -479,37 +481,57 @@ export default function Enterprise() {
   return (
     <div className="dark min-h-screen flex flex-col" style={{ background: "#080808" }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between px-4 md:px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="flex items-center gap-3 md:gap-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="md:hidden text-white/70 hover:text-white transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <a href="/">
-            <img src="/logo.png" alt="XMem" className="h-7 w-auto invert" />
+            <img src="/logo.png" alt="XMem" className="h-6 md:h-7 w-auto invert" />
           </a>
-          <div className="w-px h-5 bg-white/10" />
-          <span className="text-xs text-white/40 uppercase tracking-widest">Enterprise</span>
+          <div className="hidden md:block w-px h-5 bg-white/10" />
+          <span className="hidden md:inline text-xs text-white/40 uppercase tracking-widest">Enterprise</span>
           {activeProject && (
             <>
-              <ChevronRight className="w-4 h-4 text-white/30" />
-              <span className="text-sm text-white/80">{activeProject.name}</span>
+              <ChevronRight className="hidden md:block w-4 h-4 text-white/30" />
+              <span className="hidden md:inline text-sm text-white/80">{activeProject.name}</span>
             </>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
           <button
             onClick={() => setShowCreateProject(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-white/70 transition-colors"
+            className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-white/70 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            New Project
+            <span className="hidden md:inline">New Project</span>
+            <span className="md:hidden">New</span>
           </button>
-          <span className="text-sm text-white/50">{username}</span>
-          <a href="/dashboard" className="text-xs text-white/30 hover:text-white/60 transition-colors">Dashboard</a>
+          <span className="text-xs md:text-sm text-white/50 truncate max-w-[80px] md:max-w-none">{username}</span>
+          <a href="/dashboard" className="hidden md:inline text-xs text-white/30 hover:text-white/60 transition-colors">Dashboard</a>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile backdrop */}
+        {isSidebarOpen && (
+          <div 
+            className="absolute inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" 
+            onClick={() => setIsSidebarOpen(false)} 
+          />
+        )}
+        
         {/* Left Panel - Projects */}
-        <aside className="w-72 flex-shrink-0 flex flex-col min-h-0 overflow-hidden" style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+        <aside 
+          className={`absolute md:relative z-50 w-72 h-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden bg-[#0a0a0a] transform ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0 transition-transform duration-300 ease-in-out`} 
+          style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
+        >
           <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <h2 className="text-xs text-white/30 uppercase tracking-widest font-medium">Projects</h2>
           </div>
@@ -567,9 +589,9 @@ export default function Enterprise() {
             </div>
           </main>
         ) : (
-          <>
+          <div className="flex flex-1 flex-col md:flex-row min-w-0 overflow-hidden">
             {/* Project Sidebar */}
-            <aside className="w-64 flex-shrink-0 flex flex-col min-h-0 overflow-hidden" style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+            <aside className="w-full md:w-64 flex-shrink-0 flex flex-col min-h-0 h-[30vh] md:h-auto overflow-hidden border-b md:border-b-0 md:border-r border-white/5" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
               {/* Tabs */}
               <div className="flex gap-1 p-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                 {(["chat", "annotations", "team"] as const).map((tab) => (
@@ -829,7 +851,7 @@ export default function Enterprise() {
                 </form>
               </div>
             </main>
-          </>
+          </div>
         )}
       </div>
 

@@ -12,6 +12,7 @@ import {
   Globe,
   Star,
   Copy,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -169,6 +170,7 @@ export default function Scanner() {
   const [communityLoading, setCommunityLoading] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
   const [communitySort, setCommunitySort] = useState<"stars" | "recent">("stars");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const indexingRepos = useMemo(() => {
@@ -906,20 +908,26 @@ export default function Scanner() {
     >
       {/* ── Header ──────────────────────────────────────────────────── */}
       <header
-        className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+        className="flex items-center justify-between px-4 md:px-6 py-4 flex-shrink-0"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="md:hidden text-white/70 hover:text-white transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <a href="/">
-            <img src="/logo.png" alt="XMem" className="h-7 w-auto invert" />
+            <img src="/logo.png" alt="XMem" className="h-6 md:h-7 w-auto invert" />
           </a>
-          <div className="w-px h-5 bg-white/10" />
-          <span className="text-xs text-white/40 uppercase tracking-widest">
+          <div className="hidden md:block w-px h-5 bg-white/10" />
+          <span className="hidden md:inline text-xs text-white/40 uppercase tracking-widest">
             Scanner
           </span>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-white/50">
+        <div className="flex items-center gap-3 md:gap-4">
+          <span className="text-xs md:text-sm text-white/50 truncate max-w-[100px] md:max-w-none">
             {user?.username ?? user?.name}
           </span>
           <button
@@ -932,10 +940,20 @@ export default function Scanner() {
       </header>
 
       {/* ── Body ────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile backdrop */}
+        {isSidebarOpen && (
+          <div 
+            className="absolute inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" 
+            onClick={() => setIsSidebarOpen(false)} 
+          />
+        )}
+        
         {/* ── Left Panel ──────────────────────────────────────────── */}
         <aside
-          className="w-80 flex-shrink-0 flex flex-col min-h-0 overflow-hidden"
+          className={`absolute md:relative z-50 w-72 md:w-80 h-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden bg-[#0a0a0a] transform ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0 transition-transform duration-300 ease-in-out`}
           style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
         >
           <div
