@@ -13,6 +13,7 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import SetUsername from "@/pages/set-username";
 import DocsPage from "@/pages/docs";
+import Enterprise from "@/pages/enterprise";
 
 function Router() {
   return (
@@ -30,6 +31,9 @@ function Router() {
       </Route>
       <Route path="/context">
         <RequireUsername component={ContextImporter} />
+      </Route>
+      <Route path="/enterprise">
+        <RequireUsername component={Enterprise} />
       </Route>
       <Route path="/docs" component={DocsPage} />
       <Route component={NotFound} />
