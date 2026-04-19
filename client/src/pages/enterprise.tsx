@@ -121,7 +121,7 @@ function AnnotationTypeIcon({ type }: { type: string }) {
 export default function Enterprise() {
   const { user, token, logout: authLogout, isAuthenticated, isLoading } = useAuth();
   const username = user?.username ?? user?.name ?? "";
-  const userId = user?.id ?? user?.google_id ?? "";
+  const userId = user?.id ?? "";
 
   // State
   const [projects, setProjects] = useState<Project[]>([]);
