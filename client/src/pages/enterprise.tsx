@@ -22,6 +22,9 @@ import {
   Code,
   Menu,
   CheckCircle,
+  MoreVertical,
+  Trash2,
+  Edit3,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -139,14 +142,15 @@ export default function Enterprise() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAnnotationPanel, setShowAnnotationPanel] = useState(false);
+  const [showEditMember, setShowEditMember] = useState<TeamMember | null>(null);
   const [activeTab, setActiveTab] = useState<"chat" | "annotations" | "team">("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Form state
   const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectOrg, setNewProjectOrg] = useState("");
-  const [newProjectRepo, setNewProjectRepo] = useState("");
+  const [newProjectGithubUrl, setNewProjectGithubUrl] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
+  const [githubUrlError, setGithubUrlError] = useState("");
   const [newMemberUsername, setNewMemberUsername] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<TeamMember["role"]>("intern");
   const [foundUser, setFoundUser] = useState<{id: string; username: string; email?: string; name?: string; picture?: string} | null>(null);
@@ -158,18 +162,59 @@ export default function Enterprise() {
 
   // Scanner state
   const [isScanning, setIsScanning] = useState(false);
-  const [scanPhase, setScanPhase] = useState<"idle" | "phase1" | "phase2" | "complete">("idle");
+  const [scanPhase, setScanPhase] = useState<"idle" | "phase1" | "phase2" | "complete" | "failed">("idle");
   const [scanProgress, setScanProgress] = useState({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
   const [scanError, setScanError] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Check if user is manager
-  const isManager = useMemo(() => {
-    if (!activeProject) return false;
+  const currentUserRole = useMemo(() => {
+    if (!activeProject) return null;
+    if (activeProject.created_by === userId) return "manager";
     const member = teamMembers.find(m => m.user_id === userId);
-    return member?.role === "manager" || activeProject.created_by === userId;
+    return member?.role || null;
   }, [activeProject, teamMembers, userId]);
+
+  // Permission hierarchy (higher = more permissions)
+  const roleHierarchy: Record<TeamMember["role"], number> = {
+    manager: 4,
+    staff_engineer: 3,
+    sde2: 2,
+    intern: 1,
+  };
+
+  // Check if current user can manage team (add/remove members)
+  const canManageTeam = useMemo(() => {
+    return currentUserRole === "manager";
+  }, [currentUserRole]);
+
+  // Check if current user can edit a specific member's role
+  const canEditMember = useMemo(() => (targetRole: TeamMember["role"], targetUserId: string) => {
+    if (!currentUserRole) return false;
+    // Cannot edit self
+    if (targetUserId === userId) return false;
+    // Manager can edit anyone
+    if (currentUserRole === "manager") return true;
+    // Staff Engineer can edit SDE2 and Intern
+    if (currentUserRole === "staff_engineer" && roleHierarchy[targetRole] <= 2) return true;
+    // SDE2 and Intern cannot edit anyone
+    return false;
+  }, [currentUserRole, userId]);
+
+  // Check if current user can remove a specific member
+  const canRemoveMember = useMemo(() => (targetRole: TeamMember["role"], targetUserId: string) => {
+    if (!currentUserRole) return false;
+    // Cannot remove self through this function
+    if (targetUserId === userId) return false;
+    // Manager can remove anyone
+    if (currentUserRole === "manager") return true;
+    // Others cannot remove members
+    return false;
+  }, [currentUserRole, userId]);
+
+  // Legacy compatibility
+  const isManager = useMemo(() => currentUserRole === "manager", [currentUserRole]);
 
   // Load projects
   useEffect(() => {
@@ -219,9 +264,32 @@ export default function Enterprise() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Parse GitHub URL to extract org and repo
+  const parseGithubUrl = (url: string): { org: string; repo: string } | null => {
+    try {
+      // Support formats:
+      // https://github.com/org/repo
+      // https://github.com/org/repo.git
+      // github.com/org/repo
+      const match = url.match(/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
+      if (match) {
+        return { org: match[1], repo: match[2] };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   // Create project
   const handleCreateProject = async () => {
-    if (!newProjectName.trim() || !newProjectOrg.trim() || !newProjectRepo.trim()) return;
+    if (!newProjectName.trim() || !newProjectGithubUrl.trim()) return;
+
+    const parsed = parseGithubUrl(newProjectGithubUrl);
+    if (!parsed) {
+      setGithubUrlError("Invalid GitHub URL. Format: https://github.com/org/repo");
+      return;
+    }
 
     try {
       const resp = await fetch(`${API_URL}/v1/enterprise/projects`, {
@@ -229,8 +297,8 @@ export default function Enterprise() {
         headers: authJsonHeaders(token),
         body: JSON.stringify({
           name: newProjectName,
-          org_id: newProjectOrg,
-          repo: newProjectRepo,
+          org_id: parsed.org,
+          repo: parsed.repo,
           description: newProjectDesc,
         }),
       });
@@ -242,18 +310,102 @@ export default function Enterprise() {
         setActiveProject(newProject);
         setShowCreateProject(false);
         setNewProjectName("");
-        setNewProjectOrg("");
-        setNewProjectRepo("");
+        setNewProjectGithubUrl("");
         setNewProjectDesc("");
+        setGithubUrlError("");
         setMessages([{
           id: `welcome-${Date.now()}`,
           role: "status",
-          content: `Created project "${newProject.name}". Add team members to start collaborating.`,
+          content: `Created project "${newProject.name}". Starting repository scan...`,
         }]);
+        // Auto-start scanning after project creation
+        setTimeout(() => {
+          startScanWithProject(newProject);
+        }, 500);
       }
     } catch (e) {
       console.error("Failed to create project:", e);
     }
+  };
+
+  // Start scan with specific project (used for auto-scan after creation)
+  const startScanWithProject = async (project: Project) => {
+    setIsScanning(true);
+    setScanPhase("phase1");
+    setScanError("");
+    setScanProgress({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
+
+    try {
+      const resp = await fetch(`${API_URL}/v1/scanner/scan`, {
+        method: "POST",
+        headers: authJsonHeaders(token),
+        body: JSON.stringify({
+          github_url: `https://github.com/${project.org_id}/${project.repo}`,
+          username: username,
+          branch: "main",
+        }),
+      });
+
+      const data = await resp.json();
+      if (data.status === "ok") {
+        pollScanStatusForProject(project);
+      } else {
+        setScanError(data.error || "Failed to start scan");
+        setIsScanning(false);
+        setScanPhase("idle");
+      }
+    } catch (e) {
+      console.error("Failed to start scan:", e);
+      setScanError("Network error. Please try again.");
+      setIsScanning(false);
+      setScanPhase("idle");
+    }
+  };
+
+  // Poll scan status for a specific project
+  const pollScanStatusForProject = async (project: Project) => {
+    const interval = setInterval(async () => {
+      try {
+        const resp = await fetch(
+          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(project.org_id)}&repo=${encodeURIComponent(project.repo)}`,
+          { headers: authBearerHeaders(token) }
+        );
+
+        const data = await resp.json();
+        
+        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setScanPhase("complete");
+          setIsScanning(false);
+          clearInterval(interval);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `scan-complete-${Date.now()}`,
+              role: "status",
+              content: "Repository scan complete! You can now chat and add annotations.",
+            },
+          ]);
+        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
+          setScanError("Scan failed. Please check the repository and try again.");
+          setScanPhase("failed");
+          setIsScanning(false);
+          clearInterval(interval);
+        } else {
+          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
+          if (data.stats) {
+            setScanProgress({
+              files_processed: data.stats.files_processed || 0,
+              total_files: data.stats.total_files_to_process || 0,
+              symbols_indexed: data.stats.symbols_indexed || 0,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll scan status:", e);
+      }
+    }, 3000);
+
+    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
   // Lookup user by username
@@ -327,6 +479,59 @@ export default function Enterprise() {
     } catch (e) {
       console.error("Failed to add member:", e);
       setUserSearchError("Failed to add member. Please try again.");
+    }
+  };
+
+  // Update member role
+  const handleUpdateRole = async (memberId: string, newRole: TeamMember["role"]) => {
+    if (!activeProject || !showEditMember) return;
+
+    try {
+      const resp = await fetch(
+        `${API_URL}/v1/enterprise/projects/${activeProject.id}/team/${memberId}`,
+        {
+          method: "PATCH",
+          headers: authJsonHeaders(token),
+          body: JSON.stringify({ role: newRole }),
+        }
+      );
+
+      const data = await resp.json();
+      if (data.status === "ok") {
+        setTeamMembers(teamMembers.map(m =>
+          m.id === memberId ? { ...m, role: newRole } : m
+        ));
+        setShowEditMember(null);
+      }
+    } catch (e) {
+      console.error("Failed to update role:", e);
+    }
+  };
+
+  // Remove member from project
+  const handleRemoveMember = async (memberId: string) => {
+    if (!activeProject) return;
+
+    if (!confirm("Are you sure you want to remove this member from the project?")) {
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `${API_URL}/v1/enterprise/projects/${activeProject.id}/team/${memberId}`,
+        {
+          method: "DELETE",
+          headers: authBearerHeaders(token),
+        }
+      );
+
+      const data = await resp.json();
+      if (data.status === "ok") {
+        setTeamMembers(teamMembers.filter(m => m.id !== memberId));
+        setShowEditMember(null);
+      }
+    } catch (e) {
+      console.error("Failed to remove member:", e);
     }
   };
 
@@ -659,17 +864,17 @@ export default function Enterprise() {
       <div className="flex flex-1 overflow-hidden relative">
         {/* Mobile backdrop */}
         {isSidebarOpen && (
-          <div 
-            className="absolute inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" 
-            onClick={() => setIsSidebarOpen(false)} 
+          <div
+            className="absolute inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+            onClick={() => setIsSidebarOpen(false)}
           />
         )}
-        
+
         {/* Left Panel - Projects */}
-        <aside 
-          className={`absolute md:relative z-50 w-72 h-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden bg-[#0a0a0a] transform ${
+        <aside
+          className={`absolute md:relative z-50 w-64 lg:w-72 h-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden bg-[#0a0a0a] transform ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0 transition-transform duration-300 ease-in-out`} 
+          } md:translate-x-0 transition-transform duration-300 ease-in-out`}
           style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
         >
           <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -684,6 +889,7 @@ export default function Enterprise() {
                   key={project.id}
                   onClick={() => {
                     setActiveProject(project);
+                    setActiveTab("chat");
                     setMessages([]);
                     loadAnnotationsForProject(project.id);
                   }}
@@ -692,179 +898,161 @@ export default function Enterprise() {
                       ? "bg-white/10 border border-white/10"
                       : "hover:bg-white/5 border border-transparent"
                   }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-white/90 font-medium truncate">{project.name}</span>
-                    {project.annotation_count > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/50">
-                        {project.annotation_count}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-white/40 flex items-center gap-2">
-                    <GitBranch className="w-3 h-3" />
-                    {project.org_id}/{project.repo}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-white/90 font-medium truncate">{project.name}</span>
+                        {project.annotation_count > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/50">
+                            {project.annotation_count}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-white/40 flex items-center gap-2">
+                        <GitBranch className="w-3 h-3" />
+                        {project.org_id}/{project.repo}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
 
-        {/* Center/Right Content */}
-        {!activeProject ? (
-          <main className="flex-1 flex flex-col items-center justify-center p-8">
-            <div className="text-center max-w-md">
-              <Users className="w-12 h-12 text-white/20 mx-auto mb-4" />
-              <h2 className="text-xl text-white/90 font-medium mb-2">Enterprise Team Annotations</h2>
-              <p className="text-sm text-white/40 mb-6">
-                Create a project to start collaborating with your team. Add annotations to share knowledge about your codebase.
-              </p>
-              <button
-                onClick={() => setShowCreateProject(true)}
-                className="px-6 py-3 bg-white text-black rounded-lg font-medium text-sm"
-              >
-                Create Your First Project
-              </button>
-            </div>
-          </main>
-        ) : (
-          <div className="flex flex-1 flex-col md:flex-row min-w-0 overflow-hidden">
-            {/* Project Sidebar */}
-            <aside className="w-full md:w-64 flex-shrink-0 flex flex-col min-h-0 h-[30vh] md:h-auto overflow-hidden border-b md:border-b-0 md:border-r border-white/5" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              {/* Tabs */}
-              <div className="flex gap-1 p-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                {(["chat", "annotations", "team"] as const).map((tab) => (
+            {/* Main Content Area */}
+            {!activeProject ? (
+              <main className="flex-1 flex flex-col items-center justify-center p-8">
+                <div className="text-center max-w-md">
+                  <Users className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                  <h2 className="text-xl text-white/90 font-medium mb-2">Enterprise Team Annotations</h2>
+                  <p className="text-sm text-white/40 mb-6">
+                    Create a project to start collaborating with your team. Add annotations to share knowledge about your codebase.
+                  </p>
                   <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`flex-1 rounded-lg px-2 py-2 text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                      activeTab === tab ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"
-                    }`}
+                    onClick={() => setShowCreateProject(true)}
+                    className="px-6 py-3 bg-white text-black rounded-lg font-medium text-sm"
                   >
-                    {tab}
+                    Create Your First Project
                   </button>
-                ))}
+                </div>
+              </main>
+            ) : (
+              <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* Tabs Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-black/20">
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="w-4 h-4 text-white/40" />
+                      <span className="text-sm text-white/70">{activeProject.org_id}/{activeProject.repo}</span>
+                    </div>
+                  <div className="h-4 w-px bg-white/10" />
+                  <div className="flex gap-1">
+                    {(["chat", "annotations", "team"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          activeTab === tab
+                            ? "bg-white/10 text-white"
+                            : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                        }`}
+                      >
+                        {tab === "chat" && (
+                          <span className="flex items-center gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5" /> Chat
+                          </span>
+                        )}
+                        {tab === "annotations" && (
+                          <span className="flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5" /> Annotations
+                          </span>
+                        )}
+                        {tab === "team" && (
+                          <span className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5" /> Team
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveProject(null)}
+                  className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                >
+                  Close
+                </button>
               </div>
 
               {/* Tab Content */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {activeTab === "team" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs text-white/30 uppercase tracking-widest">Team Members</h3>
-                      {isManager && (
-                        <button
-                          onClick={() => setShowAddMember(true)}
-                          className="text-[10px] text-white/50 hover:text-white/80 flex items-center gap-1"
-                        >
-                          <Plus className="w-3 h-3" /> Add
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {teamMembers.map((member) => (
-                        <div key={member.id} className="p-3 bg-white/5 rounded-lg border border-white/5">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-white/80">{member.username}</span>
-                            <RoleBadge role={member.role} />
-                          </div>
-                          {member.email && (
-                            <div className="text-[10px] text-white/40">{member.email}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "annotations" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs text-white/30 uppercase tracking-widest">Annotations</h3>
-                      <button
-                        onClick={() => setShowAnnotationPanel(true)}
-                        className="text-[10px] text-white/50 hover:text-white/80 flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" /> Add
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {annotations.length === 0 ? (
-                        <p className="text-xs text-white/30 text-center py-4">No annotations yet.</p>
-                      ) : (
-                        annotations.map((ann) => (
-                          <div key={ann.id} className="p-3 bg-white/5 rounded-lg border border-white/5">
-                            <div className="flex items-start gap-2 mb-2">
-                              <AnnotationTypeIcon type={ann.annotation_type} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-white/70 line-clamp-3">{ann.content}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between text-[10px] text-white/40">
-                              <span>{ann.author_name}</span>
-                              {ann.file_path && (
-                                <span className="truncate max-w-[100px]">{ann.file_path}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-
+              <div className="flex-1 overflow-hidden">
+                {/* CHAT TAB */}
                 {activeTab === "chat" && (
-                  <div className="space-y-4">
-                    {/* Scan Status */}
+                  <div className="flex flex-col h-full">
+                    {/* Chat Header Info */}
+                    <div className="px-4 py-2 border-b border-white/5 bg-black/20 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs text-white/40">Ask about the codebase and see team annotations in context</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-white/40 uppercase tracking-widest">Debug</span>
+                        <button
+                          onClick={() => setDebugMode(!debugMode)}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${debugMode ? "bg-blue-500/80" : "bg-white/10"}`}
+                        >
+                          <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${debugMode ? "translate-x-4" : "translate-x-0"}`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scan Status Banner */}
                     {scanPhase === "idle" && (
-                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm text-white/80">Repository needs to be scanned</p>
-                            <p className="text-xs text-white/50 mt-1">Scan the codebase to enable chat and annotations.</p>
-                            <button
-                              onClick={startScan}
-                              disabled={isScanning}
-                              className="mt-3 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                            >
-                              {isScanning ? "Starting..." : "Start Scan"}
-                            </button>
+                      <div className="px-4 py-3 bg-yellow-500/10 border-b border-yellow-500/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 text-yellow-400" />
+                            <div>
+                              <p className="text-sm text-white/80">Repository needs to be scanned</p>
+                              <p className="text-xs text-white/50">Scan the codebase to enable chat and annotations.</p>
+                            </div>
                           </div>
+                          <button
+                            onClick={startScan}
+                            disabled={isScanning}
+                            className="px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                          >
+                            {isScanning ? "Starting..." : "Start Scan"}
+                          </button>
                         </div>
                       </div>
                     )}
 
                     {(scanPhase === "phase1" || scanPhase === "phase2") && (
-                      <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <div className="flex items-center gap-3 mb-3">
-                          <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-                          <div>
-                            <p className="text-sm text-white/80">
-                              {scanPhase === "phase1" ? "Phase 1: Indexing..." : "Phase 2: Enriching..."}
-                            </p>
+                      <div className="px-4 py-3 bg-blue-500/10 border-b border-blue-500/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                            <div>
+                              <p className="text-sm text-white/80">
+                                {scanPhase === "phase1" ? "Phase 1: Indexing files..." : "Phase 2: Analyzing symbols..."}
+                              </p>
+                            </div>
                           </div>
+                          <span className="text-xs text-white/50">
+                            {scanProgress.files_processed} / {scanProgress.total_files} files
+                          </span>
                         </div>
                         {scanProgress.total_files > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs text-white/50">
-                              <span>Files</span>
-                              <span>{scanProgress.files_processed} / {scanProgress.total_files}</span>
-                            </div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-500 rounded-full transition-all"
-                                style={{ width: `${(scanProgress.files_processed / scanProgress.total_files) * 100}%` }}
-                              />
-                            </div>
+                          <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden max-w-md">
+                            <div
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{ width: `${(scanProgress.files_processed / scanProgress.total_files) * 100}%` }}
+                            />
                           </div>
                         )}
                       </div>
                     )}
 
                     {scanPhase === "complete" && (
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                      <div className="px-4 py-2 bg-emerald-500/10 border-b border-emerald-500/30">
                         <div className="flex items-center gap-2">
                           <CheckCircle className="w-4 h-4 text-emerald-400" />
                           <p className="text-xs text-emerald-300">Repository scanned and ready</p>
@@ -873,96 +1061,46 @@ export default function Enterprise() {
                     )}
 
                     {scanError && (
-                      <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                        <p className="text-xs text-red-400">{scanError}</p>
-                        <button
-                          onClick={() => {
-                            setScanError("");
-                            setScanPhase("idle");
-                          }}
-                          className="mt-2 text-xs text-white/50 hover:text-white/80 underline"
-                        >
-                          Try again
-                        </button>
+                      <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-red-400">{scanError}</p>
+                          <button
+                            onClick={() => {
+                              setScanError("");
+                              setScanPhase("idle");
+                            }}
+                            className="text-xs text-white/50 hover:text-white/80 underline"
+                          >
+                            Try again
+                          </button>
+                        </div>
                       </div>
                     )}
 
-                    <h3 className="text-xs text-white/30 uppercase tracking-widest pt-2">Quick Actions</h3>
-                    <button
-                      onClick={() => {
-                        setChatInput("What are the known issues in this codebase?");
-                        setActiveTab("chat");
-                      }}
-                      disabled={scanPhase !== "complete"}
-                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <div className="text-xs text-white/70">Find known issues</div>
-                      <div className="text-[10px] text-white/40 mt-1">Search bug reports and warnings</div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setChatInput("Explain the architecture of this project");
-                        setActiveTab("chat");
-                      }}
-                      disabled={scanPhase !== "complete"}
-                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <div className="text-xs text-white/70">Explain architecture</div>
-                      <div className="text-[10px] text-white/40 mt-1">Get high-level overview</div>
-                    </button>
-                    <button
-                      onClick={() => setShowAnnotationPanel(true)}
-                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors"
-                    >
-                      <div className="text-xs text-white/70">Add annotation</div>
-                      <div className="text-[10px] text-white/40 mt-1">Share knowledge with team</div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </aside>
-
-            {/* Chat Area */}
-            <main className="flex-1 flex flex-col min-w-0">
-              {/* Chat Header */}
-              <div className="border-b border-white/5 p-4 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-10">
-                <div>
-                  <h3 className="text-white font-medium flex items-center gap-2">
-                    <MessageSquare size={16} className="text-blue-400" />
-                    Team Chat
-                  </h3>
-                  <p className="text-xs text-white/40 mt-0.5">
-                    {activeProject.org_id}/{activeProject.repo}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-white/40 uppercase tracking-widest">Debug</span>
-                    <button
-                      onClick={() => setDebugMode(!debugMode)}
-                      className={`relative w-8 h-4 rounded-full transition-colors ${debugMode ? "bg-blue-500/80" : "bg-white/10"}`}
-                    >
-                      <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${debugMode ? "translate-x-4" : "translate-x-0"}`} />
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => setActiveProject(null)}
-                    className="text-xs text-white/40 hover:text-white transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-                {messages.length === 0 && (
-                  <div className="text-center py-12">
-                    <MessageSquare className="w-10 h-10 text-white/10 mx-auto mb-4" />
-                    <p className="text-sm text-white/30">Start a conversation with your team.</p>
-                    <p className="text-xs text-white/20 mt-2">Ask about the codebase and see team annotations in context.</p>
-                  </div>
-                )}
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                      {messages.length === 0 && (
+                        <div className="text-center py-12">
+                          <MessageSquare className="w-10 h-10 text-white/10 mx-auto mb-4" />
+                          <p className="text-sm text-white/30">Start a conversation with your team.</p>
+                          <div className="flex gap-3 justify-center mt-6">
+                            <button
+                              onClick={() => setChatInput("What are the known issues in this codebase?")}
+                              disabled={scanPhase !== "complete"}
+                              className="px-4 py-2 bg-white/5 rounded-lg text-xs text-white/60 hover:bg-white/10 transition-colors disabled:opacity-30"
+                            >
+                              Find issues
+                            </button>
+                            <button
+                              onClick={() => setChatInput("Explain the architecture")}
+                              disabled={scanPhase !== "complete"}
+                              className="px-4 py-2 bg-white/5 rounded-lg text-xs text-white/60 hover:bg-white/10 transition-colors disabled:opacity-30"
+                            >
+                              Explain architecture
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                 {messages.map((msg) => {
                   if (msg.role === "status") {
@@ -1063,10 +1201,172 @@ export default function Enterprise() {
                   </button>
                 </form>
               </div>
+            </div>
+          )}
+
+          {/* ANNOTATIONS TAB */}
+          {activeTab === "annotations" && (
+                  <div className="flex flex-col h-full">
+                    {/* Annotations Header */}
+                    <div className="px-4 py-3 border-b border-white/5 bg-black/20 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-white">Team Annotations</h3>
+                        <p className="text-xs text-white/40 mt-0.5">Knowledge shared by your team</p>
+                      </div>
+                      <button
+                        onClick={() => setShowAnnotationPanel(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-white transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Annotation
+                      </button>
+                    </div>
+
+                    {/* Annotations List */}
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                      {annotations.length === 0 ? (
+                        <div className="text-center py-12">
+                          <FileText className="w-10 h-10 text-white/10 mx-auto mb-4" />
+                          <p className="text-sm text-white/30">No annotations yet.</p>
+                          <p className="text-xs text-white/20 mt-2">Add annotations to share knowledge with your team.</p>
+                          <button
+                            onClick={() => setShowAnnotationPanel(true)}
+                            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-xs text-white hover:bg-white/20 transition-colors"
+                          >
+                            Add First Annotation
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 max-w-3xl">
+                          {annotations.map((ann) => (
+                            <div key={ann.id} className="p-4 bg-white/[0.03] rounded-lg border border-white/10 hover:border-white/20 transition-colors">
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <AnnotationTypeIcon type={ann.annotation_type} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-white/80 leading-relaxed">{ann.content}</p>
+                                  <div className="flex items-center gap-3 mt-3 text-[11px] text-white/40">
+                                    <span className="text-white/60">{ann.author_name}</span>
+                                    <RoleBadge role={ann.author_role} />
+                                    {ann.file_path && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="font-mono text-white/30">{ann.file_path}</span>
+                                      </>
+                                    )}
+                                    {ann.symbol_name && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="font-mono text-white/30">{ann.symbol_name}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-white/20 mt-2">
+                                    {new Date(ann.created_at).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+            {/* TEAM TAB */}
+            {activeTab === "team" && (
+                  <div className="flex flex-col h-full">
+                    {/* Team Header */}
+                    <div className="px-4 py-3 border-b border-white/5 bg-black/20 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-white">Team Members</h3>
+                        <p className="text-xs text-white/40 mt-0.5">
+                          {teamMembers.length} member{teamMembers.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      {canManageTeam && (
+                        <button
+                          onClick={() => setShowAddMember(true)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-white transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Member
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Team Members List */}
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                      <div className="max-w-2xl space-y-2">
+                        {/* Project Creator */}
+                        <div className="p-4 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                              <Crown className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-white">Project Creator</span>
+                                <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">Manager</span>
+                              </div>
+                              <p className="text-xs text-white/40 mt-0.5">
+                                Created this project and has full access
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Team Members */}
+                        {teamMembers.length === 0 ? (
+                          <div className="text-center py-8">
+                            <Users className="w-10 h-10 text-white/10 mx-auto mb-4" />
+                            <p className="text-sm text-white/30">No team members yet.</p>
+                            <p className="text-xs text-white/20 mt-2">Add members to collaborate on this project.</p>
+                          </div>
+                        ) : (
+                          teamMembers.map((member) => (
+                            <div
+                              key={member.id}
+                              className="p-4 bg-white/[0.03] rounded-lg border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                                    <User className="w-5 h-5 text-white/50" />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-white">{member.username}</span>
+                                      <RoleBadge role={member.role} />
+                                    </div>
+                                    {member.email && (
+                                      <p className="text-xs text-white/40 mt-0.5">{member.email}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {(canEditMember(member.role, member.user_id) || canRemoveMember(member.role, member.user_id)) && (
+                                    <button
+                                      onClick={() => setShowEditMember(member)}
+                                      className="p-2 text-white/30 hover:text-white/60 hover:bg-white/5 rounded-lg transition-colors"
+                                      title="Manage member"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </main>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
       {/* Create Project Modal */}
       {showCreateProject && (
@@ -1074,7 +1374,10 @@ export default function Enterprise() {
           <div className="bg-[#111] rounded-xl border border-white/10 w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg text-white font-medium">Create Project</h2>
-              <button onClick={() => setShowCreateProject(false)} className="text-white/40 hover:text-white">
+              <button onClick={() => {
+                setShowCreateProject(false);
+                setGithubUrlError("");
+              }} className="text-white/40 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1089,27 +1392,24 @@ export default function Enterprise() {
                   placeholder="e.g., Payment Service"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Organization</label>
-                  <input
-                    type="text"
-                    value={newProjectOrg}
-                    onChange={(e) => setNewProjectOrg(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm"
-                    placeholder="e.g., myorg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Repository</label>
-                  <input
-                    type="text"
-                    value={newProjectRepo}
-                    onChange={(e) => setNewProjectRepo(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm"
-                    placeholder="e.g., backend"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">GitHub Repository URL</label>
+                <input
+                  type="text"
+                  value={newProjectGithubUrl}
+                  onChange={(e) => {
+                    setNewProjectGithubUrl(e.target.value);
+                    setGithubUrlError("");
+                  }}
+                  className={`w-full bg-white/5 border ${githubUrlError ? 'border-red-500/50' : 'border-white/10'} rounded-lg px-3 py-2.5 text-white text-sm`}
+                  placeholder="https://github.com/org/repo"
+                />
+                {githubUrlError && (
+                  <p className="mt-1.5 text-xs text-red-400">{githubUrlError}</p>
+                )}
+                <p className="mt-1.5 text-[10px] text-white/30">
+                  The repository will be automatically scanned after creation.
+                </p>
               </div>
               <div>
                 <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Description</label>
@@ -1122,10 +1422,10 @@ export default function Enterprise() {
               </div>
               <button
                 onClick={handleCreateProject}
-                disabled={!newProjectName.trim() || !newProjectOrg.trim() || !newProjectRepo.trim()}
+                disabled={!newProjectName.trim() || !newProjectGithubUrl.trim()}
                 className="w-full py-3 bg-white text-black rounded-lg font-medium text-sm disabled:opacity-30"
               >
-                Create Project
+                Create & Scan Project
               </button>
             </div>
           </div>
@@ -1212,6 +1512,74 @@ export default function Enterprise() {
               >
                 Add Member
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Modal */}
+      {showEditMember && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] rounded-xl border border-white/10 w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg text-white font-medium">Manage Team Member</h2>
+              <button onClick={() => setShowEditMember(null)} className="text-white/40 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-white font-medium">{showEditMember.username}</p>
+                  <p className="text-xs text-white/50">Current role: {showEditMember.role.replace("_", " ")}</p>
+                </div>
+              </div>
+
+              {canEditMember(showEditMember.role, showEditMember.user_id) && (
+                <div>
+                  <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Update Role</label>
+                  <select
+                    value={showEditMember.role}
+                    onChange={(e) => handleUpdateRole(showEditMember.id, e.target.value as TeamMember["role"])}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm"
+                  >
+                    {currentUserRole === "manager" && (
+                      <>
+                        <option value="intern">Intern</option>
+                        <option value="sde2">SDE 2</option>
+                        <option value="staff_engineer">Staff Engineer</option>
+                        <option value="manager">Manager</option>
+                      </>
+                    )}
+                    {currentUserRole === "staff_engineer" && (
+                      <>
+                        <option value="intern">Intern</option>
+                        <option value="sde2">SDE 2</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                {canRemoveMember(showEditMember.role, showEditMember.user_id) && (
+                  <button
+                    onClick={() => handleRemoveMember(showEditMember.id)}
+                    className="flex-1 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" /> Remove from Project
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowEditMember(null)}
+                  className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
