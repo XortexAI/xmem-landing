@@ -21,6 +21,7 @@ import {
   Crown,
   Code,
   Menu,
+  CheckCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -148,9 +149,18 @@ export default function Enterprise() {
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [newMemberUsername, setNewMemberUsername] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<TeamMember["role"]>("intern");
+  const [foundUser, setFoundUser] = useState<{id: string; username: string; email?: string; name?: string; picture?: string} | null>(null);
+  const [userSearchError, setUserSearchError] = useState("");
+  const [isSearchingUser, setIsSearchingUser] = useState(false);
   const [newAnnotationContent, setNewAnnotationContent] = useState("");
   const [newAnnotationType, setNewAnnotationType] = useState<Annotation["annotation_type"]>("explanation");
   const [newAnnotationTarget, setNewAnnotationTarget] = useState("");
+
+  // Scanner state
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanPhase, setScanPhase] = useState<"idle" | "phase1" | "phase2" | "complete">("idle");
+  const [scanProgress, setScanProgress] = useState({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
+  const [scanError, setScanError] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -246,9 +256,47 @@ export default function Enterprise() {
     }
   };
 
+  // Lookup user by username
+  const lookupUser = async (username: string) => {
+    if (!username.trim()) {
+      setFoundUser(null);
+      setUserSearchError("");
+      return;
+    }
+
+    setIsSearchingUser(true);
+    setUserSearchError("");
+    setFoundUser(null);
+
+    try {
+      const resp = await fetch(
+        `${API_URL}/v1/enterprise/users/lookup?username=${encodeURIComponent(username)}`,
+        { headers: authBearerHeaders(token) }
+      );
+
+      if (resp.status === 404) {
+        setUserSearchError(`User "${username}" not found. They need to sign up first.`);
+        setFoundUser(null);
+      } else if (!resp.ok) {
+        setUserSearchError("Error looking up user. Please try again.");
+      } else {
+        const data = await resp.json();
+        if (data.status === "ok" && data.user) {
+          setFoundUser(data.user);
+          setUserSearchError("");
+        }
+      }
+    } catch (e) {
+      console.error("Failed to lookup user:", e);
+      setUserSearchError("Network error. Please try again.");
+    } finally {
+      setIsSearchingUser(false);
+    }
+  };
+
   // Add team member
   const handleAddMember = async () => {
-    if (!activeProject || !newMemberUsername.trim()) return;
+    if (!activeProject || !foundUser) return;
 
     try {
       const resp = await fetch(
@@ -257,8 +305,9 @@ export default function Enterprise() {
           method: "POST",
           headers: authJsonHeaders(token),
           body: JSON.stringify({
-            user_id: newMemberUsername, // In real app, would lookup user_id from username
-            username: newMemberUsername,
+            user_id: foundUser.id,
+            username: foundUser.username,
+            email: foundUser.email,
             role: newMemberRole,
           }),
         }
@@ -270,10 +319,101 @@ export default function Enterprise() {
         setShowAddMember(false);
         setNewMemberUsername("");
         setNewMemberRole("intern");
+        setFoundUser(null);
+        setUserSearchError("");
+      } else if (data.error) {
+        setUserSearchError(data.error);
       }
     } catch (e) {
       console.error("Failed to add member:", e);
+      setUserSearchError("Failed to add member. Please try again.");
     }
+  };
+
+  // Start scanning
+  const startScan = async () => {
+    if (!activeProject) return;
+    setIsScanning(true);
+    setScanPhase("phase1");
+    setScanError("");
+    setScanProgress({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
+
+    try {
+      const resp = await fetch(`${API_URL}/v1/scanner/scan`, {
+        method: "POST",
+        headers: authJsonHeaders(token),
+        body: JSON.stringify({
+          github_url: `https://github.com/${activeProject.org_id}/${activeProject.repo}`,
+          username: username,
+          branch: "main",
+        }),
+      });
+
+      const data = await resp.json();
+      if (data.status === "ok") {
+        // Start polling for scan status
+        pollScanStatus();
+      } else {
+        setScanError(data.error || "Failed to start scan");
+        setIsScanning(false);
+        setScanPhase("idle");
+      }
+    } catch (e) {
+      console.error("Failed to start scan:", e);
+      setScanError("Network error. Please try again.");
+      setIsScanning(false);
+      setScanPhase("idle");
+    }
+  };
+
+  // Poll scan status
+  const pollScanStatus = async () => {
+    if (!activeProject) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const resp = await fetch(
+          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(activeProject.org_id)}&repo=${encodeURIComponent(activeProject.repo)}`,
+          { headers: authBearerHeaders(token) }
+        );
+
+        const data = await resp.json();
+        
+        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setScanPhase("complete");
+          setIsScanning(false);
+          clearInterval(interval);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `scan-complete-${Date.now()}`,
+              role: "status",
+              content: "Scan complete! Repository is now ready for chat and annotations.",
+            },
+          ]);
+        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
+          setScanError("Scan failed. Please check the repository and try again.");
+          setScanPhase("idle");
+          setIsScanning(false);
+          clearInterval(interval);
+        } else {
+          // Update progress
+          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
+          if (data.stats) {
+            setScanProgress({
+              files_processed: data.stats.files_processed || 0,
+              total_files: data.stats.total_files_to_process || 0,
+              symbols_indexed: data.stats.symbols_indexed || 0,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll scan status:", e);
+      }
+    }, 3000);
+
+    // Clear interval after 10 minutes (max scan time)
+    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
   // Create annotation
@@ -331,7 +471,7 @@ export default function Enterprise() {
 
   // Send chat message
   const handleSendMessage = async () => {
-    if (!chatInput.trim() || !activeProject || chatLoading) return;
+    if (!chatInput.trim() || !activeProject || chatLoading || scanPhase !== "complete") return;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -676,13 +816,85 @@ export default function Enterprise() {
 
                 {activeTab === "chat" && (
                   <div className="space-y-4">
-                    <h3 className="text-xs text-white/30 uppercase tracking-widest">Quick Actions</h3>
+                    {/* Scan Status */}
+                    {scanPhase === "idle" && (
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm text-white/80">Repository needs to be scanned</p>
+                            <p className="text-xs text-white/50 mt-1">Scan the codebase to enable chat and annotations.</p>
+                            <button
+                              onClick={startScan}
+                              disabled={isScanning}
+                              className="mt-3 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                              {isScanning ? "Starting..." : "Start Scan"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(scanPhase === "phase1" || scanPhase === "phase2") && (
+                      <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                          <div>
+                            <p className="text-sm text-white/80">
+                              {scanPhase === "phase1" ? "Phase 1: Indexing..." : "Phase 2: Enriching..."}
+                            </p>
+                          </div>
+                        </div>
+                        {scanProgress.total_files > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs text-white/50">
+                              <span>Files</span>
+                              <span>{scanProgress.files_processed} / {scanProgress.total_files}</span>
+                            </div>
+                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full transition-all"
+                                style={{ width: `${(scanProgress.files_processed / scanProgress.total_files) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {scanPhase === "complete" && (
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-400" />
+                          <p className="text-xs text-emerald-300">Repository scanned and ready</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {scanError && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                        <p className="text-xs text-red-400">{scanError}</p>
+                        <button
+                          onClick={() => {
+                            setScanError("");
+                            setScanPhase("idle");
+                          }}
+                          className="mt-2 text-xs text-white/50 hover:text-white/80 underline"
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    )}
+
+                    <h3 className="text-xs text-white/30 uppercase tracking-widest pt-2">Quick Actions</h3>
                     <button
                       onClick={() => {
                         setChatInput("What are the known issues in this codebase?");
                         setActiveTab("chat");
                       }}
-                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors"
+                      disabled={scanPhase !== "complete"}
+                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <div className="text-xs text-white/70">Find known issues</div>
                       <div className="text-[10px] text-white/40 mt-1">Search bug reports and warnings</div>
@@ -692,7 +904,8 @@ export default function Enterprise() {
                         setChatInput("Explain the architecture of this project");
                         setActiveTab("chat");
                       }}
-                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors"
+                      disabled={scanPhase !== "complete"}
+                      className="w-full text-left p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/[0.08] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <div className="text-xs text-white/70">Explain architecture</div>
                       <div className="text-[10px] text-white/40 mt-1">Get high-level overview</div>
@@ -834,19 +1047,19 @@ export default function Enterprise() {
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Ask about the codebase..."
-                    disabled={chatLoading}
+                    placeholder={scanPhase === "complete" ? "Ask about the codebase..." : "Scan required before chatting..."}
+                    disabled={chatLoading || scanPhase !== "complete"}
                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors disabled:opacity-30"
                   />
                   <button
                     type="submit"
-                    disabled={!chatInput.trim() || chatLoading}
+                    disabled={!chatInput.trim() || chatLoading || scanPhase !== "complete"}
                     className="p-3 rounded-xl transition-all disabled:opacity-20 disabled:cursor-not-allowed"
                     style={{
-                      background: chatInput.trim() ? "white" : "rgba(255,255,255,0.06)",
+                      background: chatInput.trim() && scanPhase === "complete" ? "white" : "rgba(255,255,255,0.06)",
                     }}
                   >
-                    <Send className="w-4 h-4" style={{ color: chatInput.trim() ? "black" : "rgba(255,255,255,0.3)" }} />
+                    <Send className="w-4 h-4" style={{ color: chatInput.trim() && scanPhase === "complete" ? "black" : "rgba(255,255,255,0.3)" }} />
                   </button>
                 </form>
               </div>
@@ -925,20 +1138,59 @@ export default function Enterprise() {
           <div className="bg-[#111] rounded-xl border border-white/10 w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg text-white font-medium">Add Team Member</h2>
-              <button onClick={() => setShowAddMember(false)} className="text-white/40 hover:text-white">
+              <button onClick={() => {
+                setShowAddMember(false);
+                setFoundUser(null);
+                setUserSearchError("");
+                setNewMemberUsername("");
+              }} className="text-white/40 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Username</label>
-                <input
-                  type="text"
-                  value={newMemberUsername}
-                  onChange={(e) => setNewMemberUsername(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm"
-                  placeholder="Enter username"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMemberUsername}
+                    onChange={(e) => {
+                      setNewMemberUsername(e.target.value);
+                      setFoundUser(null);
+                      setUserSearchError("");
+                    }}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm"
+                    placeholder="Enter username"
+                  />
+                  <button
+                    onClick={() => lookupUser(newMemberUsername)}
+                    disabled={isSearchingUser || !newMemberUsername.trim()}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm disabled:opacity-30"
+                  >
+                    {isSearchingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+                  </button>
+                </div>
+                {userSearchError && (
+                  <p className="mt-2 text-xs text-red-400">{userSearchError}</p>
+                )}
+                {foundUser && (
+                  <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {foundUser.picture ? (
+                        <img src={foundUser.picture} alt="" className="w-8 h-8 rounded-full" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                          <User className="w-4 h-4 text-emerald-400" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm text-white">{foundUser.name || foundUser.username}</p>
+                        <p className="text-xs text-white/50">@{foundUser.username}</p>
+                        {foundUser.email && <p className="text-xs text-white/40">{foundUser.email}</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Role</label>
@@ -955,7 +1207,7 @@ export default function Enterprise() {
               </div>
               <button
                 onClick={handleAddMember}
-                disabled={!newMemberUsername.trim()}
+                disabled={!foundUser}
                 className="w-full py-3 bg-white text-black rounded-lg font-medium text-sm disabled:opacity-30"
               >
                 Add Member
