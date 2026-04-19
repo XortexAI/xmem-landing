@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,7 +60,6 @@ interface NewKeyData {
 
 export default function Dashboard() {
   const { user, token, logout } = useAuth();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -101,7 +99,7 @@ export default function Dashboard() {
       if (!response.ok) {
         if (response.status === 401) {
           logout();
-          setLocation('/login');
+          window.location.href = '/login';
           return;
         }
         throw new Error('Failed to fetch API keys');
@@ -115,7 +113,7 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, logout, setLocation]);
+  }, [token, logout]);
 
   useEffect(() => {
     fetchApiKeys();
@@ -138,7 +136,7 @@ export default function Dashboard() {
       if (!response.ok) {
         if (response.status === 401) {
           logout();
-          setLocation('/login');
+          window.location.href = '/login';
           return;
         }
         throw new Error('Failed to create API key');
@@ -179,7 +177,7 @@ export default function Dashboard() {
       if (!response.ok) {
         if (response.status === 401) {
           logout();
-          setLocation('/login');
+          window.location.href = '/login';
           return;
         }
         throw new Error('Failed to delete API key');
@@ -219,7 +217,7 @@ export default function Dashboard() {
       if (!response.ok) {
         if (response.status === 401) {
           logout();
-          setLocation('/login');
+          window.location.href = '/login';
           return;
         }
         throw new Error('Failed to update API key');

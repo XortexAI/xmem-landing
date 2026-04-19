@@ -83,10 +83,10 @@ function LoginContent() {
 
       // Redirect to set-username if they don't have one yet
       if (!data.user.username) {
-        setLocation('/set-username');
+        window.location.href = '/set-username';
       } else {
         // Redirect to the return URL or dashboard
-        setLocation(decodeURIComponent(returnUrl));
+        window.location.href = decodeURIComponent(returnUrl);
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -108,7 +108,7 @@ function LoginContent() {
             variant="ghost"
             size="sm"
             className="text-gray-400 hover:text-white"
-            onClick={() => setLocation('/')}
+            onClick={() => window.location.href = '/'}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home

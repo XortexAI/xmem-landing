@@ -38,12 +38,14 @@ export default function SetUsername() {
 
   // If not authenticated, let ProtectedRoute handle it (or just redirect here to be safe)
   if (!isAuthLoading && !isAuthenticated) {
-    return <Redirect to="/login" />;
+    window.location.href = '/login';
+    return null;
   }
 
   // If they already have a username, they shouldn't be here
   if (!isAuthLoading && hasUsername) {
-    return <Redirect to="/dashboard" />;
+    window.location.href = '/dashboard';
+    return null;
   }
 
   const checkAvailability = useCallback(async (username: string) => {
@@ -106,8 +108,8 @@ export default function SetUsername() {
     try {
       const success = await setUsername(usernameInput);
       if (success) {
-        // Redirect to dashboard or previous page
-        setLocation('/dashboard');
+        // Force a hard reload to clear any stale state and redirect to dashboard
+        window.location.href = '/dashboard';
       } else {
         setSubmitError("Failed to set username. Please try again.");
       }

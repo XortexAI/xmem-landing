@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,6 @@ import { LayoutDashboard, LogOut, User } from "lucide-react";
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
-  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -26,7 +25,7 @@ export function Navbar() {
 
   const handleLogout = () => {
     logout();
-    setLocation('/');
+    window.location.href = '/';
   };
 
   return (
@@ -86,7 +85,7 @@ export function Navbar() {
                 <DropdownMenuSeparator className="bg-gray-800" />
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-gray-800 focus:text-white"
-                  onClick={() => setLocation('/dashboard')}
+                  onClick={() => window.location.href = '/dashboard'}
                 >
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Dashboard

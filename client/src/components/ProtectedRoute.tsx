@@ -28,7 +28,8 @@ export function ProtectedRoute({ component: Component, children }: ProtectedRout
   if (!isAuthenticated) {
     // Store the attempted URL for redirect after login
     const returnUrl = encodeURIComponent(location);
-    return <Redirect to={`/login?returnUrl=${returnUrl}`} />;
+    window.location.href = `/login?returnUrl=${returnUrl}`;
+    return null;
   }
 
   // Render the protected component or children
@@ -56,11 +57,13 @@ export function RequireUsername({ component: Component, children }: ProtectedRou
 
   if (!isAuthenticated) {
     const returnUrl = encodeURIComponent(location);
-    return <Redirect to={`/login?returnUrl=${returnUrl}`} />;
+    window.location.href = `/login?returnUrl=${returnUrl}`;
+    return null;
   }
 
   if (!hasUsername) {
-    return <Redirect to="/set-username" />;
+    window.location.href = '/set-username';
+    return null;
   }
 
   if (children) {
