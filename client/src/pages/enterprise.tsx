@@ -136,7 +136,6 @@ export default function Enterprise() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
 
   // UI state
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -215,6 +214,27 @@ export default function Enterprise() {
 
   // Legacy compatibility
   const isManager = useMemo(() => currentUserRole === "manager", [currentUserRole]);
+
+  const updateProjectAnnotationCount = (projectId: string, increment: number) => {
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              annotation_count: Math.max(0, (project.annotation_count || 0) + increment),
+            }
+          : project
+      )
+    );
+    setActiveProject((prev) =>
+      prev?.id === projectId
+        ? {
+            ...prev,
+            annotation_count: Math.max(0, (prev.annotation_count || 0) + increment),
+          }
+        : prev
+    );
+  };
 
   // Load projects
   useEffect(() => {
@@ -644,6 +664,7 @@ export default function Enterprise() {
         setNewAnnotationContent("");
         setNewAnnotationTarget("");
         setShowAnnotationPanel(false);
+        updateProjectAnnotationCount(activeProject.id, 1);
         // Refresh annotations
         loadAnnotationsForProject(activeProject.id);
       }
@@ -678,6 +699,7 @@ export default function Enterprise() {
   const handleSendMessage = async () => {
     if (!chatInput.trim() || !activeProject || chatLoading || scanPhase !== "complete") return;
 
+    const projectId = activeProject.id;
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -696,7 +718,7 @@ export default function Enterprise() {
 
     try {
       const resp = await fetch(
-        `${API_URL}/v1/enterprise/projects/${activeProject.id}/chat`,
+        `${API_URL}/v1/enterprise/projects/${projectId}/chat`,
         {
           method: "POST",
           headers: authJsonHeaders(token),
@@ -707,9 +729,25 @@ export default function Enterprise() {
         }
       );
 
-      if (!resp.ok || !resp.body) {
-        throw new Error("Failed to get response");
+      if (!resp.ok) {
+        let msg = "Failed to get response";
+        try {
+          const errBody = await resp.json();
+          if (typeof errBody?.error === "string") {
+            msg = errBody.error;
+          } else if (typeof errBody?.detail === "string") {
+            msg = errBody.detail;
+          }
+        } catch {
+          /* use default */
+        }
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: msg } : m))
+        );
+        return;
       }
+
+      if (!resp.body) throw new Error("No response body");
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -728,7 +766,33 @@ export default function Enterprise() {
           try {
             const chunk = JSON.parse(line);
 
-            if (chunk.type === "annotations") {
+            if (chunk.type === "status") {
+              const content = chunk.content || chunk.status || "Working...";
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `status-${Date.now()}`,
+                  role: "status",
+                  content,
+                },
+              ]);
+            } else if (chunk.type === "tool_calls") {
+              const tools = chunk.tools || chunk.tool_calls || chunk.toolCalls || [];
+              if (Array.isArray(tools) && tools.length > 0) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, toolCalls: [...(m.toolCalls || []), ...tools] }
+                      : m
+                  )
+                );
+              }
+            } else if (chunk.type === "error") {
+              const content = chunk.error || chunk.message || "Failed to get response. Please try again.";
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content } : m))
+              );
+            } else if (chunk.type === "annotations") {
               setMessages((prev) => [
                 ...prev,
                 {
@@ -738,19 +802,28 @@ export default function Enterprise() {
                   annotations: chunk.annotations,
                 },
               ]);
+            } else if (chunk.type === "annotations_created") {
+              const count = Number(chunk.count ?? (Array.isArray(chunk.ids) ? chunk.ids.length : 0));
+              if (count > 0) {
+                updateProjectAnnotationCount(projectId, count);
+                loadAnnotationsForProject(projectId);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: `annotations-created-${Date.now()}`,
+                    role: "status",
+                    content: `Saved ${count} team annotation${count === 1 ? "" : "s"} from this chat.`,
+                  },
+                ]);
+              }
             } else if (chunk.type === "chunk") {
               const textToAdd = chunk.text || "";
               if (textToAdd) {
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  if (last.id === assistantId) {
-                    return [
-                      ...prev.slice(0, -1),
-                      { ...last, content: last.content + textToAdd },
-                    ];
-                  }
-                  return prev;
-                });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, content: m.content + textToAdd } : m
+                  )
+                );
               }
             }
           } catch {
@@ -759,16 +832,13 @@ export default function Enterprise() {
         }
       }
     } catch (e) {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last.id === assistantId) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: "Failed to get response. Please try again." },
-          ];
-        }
-        return prev;
-      });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: "Failed to get response. Please try again." }
+            : m
+        )
+      );
     } finally {
       setChatLoading(false);
     }
@@ -988,19 +1058,8 @@ export default function Enterprise() {
                 {activeTab === "chat" && (
                   <div className="flex flex-col h-full">
                     {/* Chat Header Info */}
-                    <div className="px-4 py-2 border-b border-white/5 bg-black/20 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs text-white/40">Ask about the codebase and see team annotations in context</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-white/40 uppercase tracking-widest">Debug</span>
-                        <button
-                          onClick={() => setDebugMode(!debugMode)}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${debugMode ? "bg-blue-500/80" : "bg-white/10"}`}
-                        >
-                          <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${debugMode ? "translate-x-4" : "translate-x-0"}`} />
-                        </button>
-                      </div>
+                    <div className="px-4 py-2 border-b border-white/5 bg-black/20">
+                      <span className="text-xs text-white/40">Ask about the codebase and see team annotations in context</span>
                     </div>
 
                     {/* Scan Status Banner */}
@@ -1152,19 +1211,6 @@ export default function Enterprise() {
                           {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
                         </div>
 
-                        {debugMode && msg.toolCalls && msg.toolCalls.length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2">
-                            <span className="text-[10px] text-white/30 uppercase tracking-widest">Tool Invocations ({msg.toolCalls.length})</span>
-                            {msg.toolCalls.map((tc, idx) => (
-                              <div key={idx} className="bg-black/40 rounded p-3 font-mono text-[11px] text-white/60 border border-white/5">
-                                <span className="text-purple-400">{tc.name}</span>
-                                <span className="text-white/30">(</span>
-                                <span className="text-blue-300/80">{JSON.stringify(tc.args)}</span>
-                                <span className="text-white/30">)</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
