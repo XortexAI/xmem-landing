@@ -9,6 +9,15 @@ import { Progress } from "@/components/ui/progress";
 import { Navbar } from "@/sections/Navbar";
 import { Link as LinkIcon, Download, User, Activity, Loader2 } from "lucide-react";
 
+type MessagePair = {
+  user_query: string;
+  agent_response: string;
+};
+
+type MemoryOperation = {
+  content?: string;
+};
+
 export default function ContextImporter() {
   const { toast } = useToast();
   const { user, token, isAuthenticated, isLoading } = useAuth();
@@ -17,14 +26,21 @@ export default function ContextImporter() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
   const [stats, setStats] = useState<{
+    messagePairs: number;
     initialTokens: number;
     tokensAfter: number;
-    accuracy: number;
+    savedTokens: number;
+    savingsPercent: number;
   } | null>(null);
   const [memories, setMemories] = useState<string[]>([]);
+  const [foundPairs, setFoundPairs] = useState(0);
+  const [formedPairs, setFormedPairs] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
-  const estimateTokens = (text: string) => Math.ceil(text.split(/\s+/).length * 1.3);
+  const estimateTokens = (text: string) => {
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    return Math.ceil(words * 1.3);
+  };
   const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 
   const authJsonHeaders = (accessToken: string): HeadersInit => ({
@@ -60,6 +76,8 @@ export default function ContextImporter() {
       setCurrentStep("Scraping chat link...");
       setStats(null);
       setMemories([]);
+      setFoundPairs(0);
+      setFormedPairs(0);
 
       const scrapeRes = await fetch(`${API_URL}/v1/memory/scrape`, {
         method: "POST",
@@ -72,11 +90,15 @@ export default function ContextImporter() {
       }
 
       const scrapeData = await scrapeRes.json();
-      const pairs = scrapeData.data?.pairs || [];
+      const pairs: MessagePair[] = scrapeData.data?.pairs || [];
 
       if (pairs.length === 0) {
         throw new Error("No messages found in the provided link.");
       }
+
+      setFoundPairs(pairs.length);
+      setCurrentStep(`Found ${pairs.length} message ${pairs.length === 1 ? "pair" : "pairs"}. Forming context...`);
+      setProgress(20);
 
       let totalInitialTokens = 0;
       let totalMemoriesTokens = 0;
@@ -84,7 +106,8 @@ export default function ContextImporter() {
 
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i];
-        setCurrentStep(`Processing message pair ${i + 1} of ${pairs.length}...`);
+        setFormedPairs(i);
+        setCurrentStep(`Forming context ${i + 1} of ${pairs.length}...`);
 
         totalInitialTokens += estimateTokens(pair.user_query) + estimateTokens(pair.agent_response);
 
@@ -99,34 +122,44 @@ export default function ContextImporter() {
           }),
         });
 
-        if (ingestRes.ok) {
-          const ingestData = await ingestRes.json();
-
-          const profileOps = ingestData.data?.profile?.operations || [];
-          const temporalOps = ingestData.data?.temporal?.operations || [];
-          const summaryOps = ingestData.data?.summary?.operations || [];
-
-          const ops = [...profileOps, ...temporalOps, ...summaryOps];
-
-          ops.forEach((op) => {
-            if (op.content) {
-              allMemories.push(op.content);
-              totalMemoriesTokens += estimateTokens(op.content);
-            }
-          });
+        if (!ingestRes.ok) {
+          throw new Error(`Memory ingest failed while forming context ${i + 1} of ${pairs.length}.`);
         }
 
-        setProgress(10 + Math.floor(((i + 1) / pairs.length) * 90));
+        const ingestData = await ingestRes.json();
+
+        const profileOps = ingestData.data?.profile?.operations || [];
+        const temporalOps = ingestData.data?.temporal?.operations || [];
+        const summaryOps = ingestData.data?.summary?.operations || [];
+
+        const ops = [...profileOps, ...temporalOps, ...summaryOps];
+
+        ops.forEach((op: MemoryOperation) => {
+          if (op.content) {
+            allMemories.push(op.content);
+            totalMemoriesTokens += estimateTokens(op.content);
+          }
+        });
+
+        setFormedPairs(i + 1);
+        setProgress(20 + Math.floor(((i + 1) / pairs.length) * 80));
       }
+
+      const savedTokens = Math.max(totalInitialTokens - totalMemoriesTokens, 0);
+      const savingsPercent = totalInitialTokens > 0
+        ? Math.round((savedTokens / totalInitialTokens) * 100)
+        : 0;
 
       setMemories(allMemories);
       setStats({
+        messagePairs: pairs.length,
         initialTokens: totalInitialTokens,
         tokensAfter: totalMemoriesTokens,
-        accuracy: 98,
+        savedTokens,
+        savingsPercent,
       });
       setIsComplete(true);
-      setCurrentStep("Processing complete!");
+      setCurrentStep(`Context formed from ${pairs.length} message ${pairs.length === 1 ? "pair" : "pairs"}.`);
       setProgress(100);
 
       toast({
@@ -256,12 +289,24 @@ export default function ContextImporter() {
 
             {isProcessing || isComplete ? (
               <Card className="bg-white/5 border-white/10 backdrop-blur-xl overflow-hidden">
-                <div className="p-6">
+                <div className="p-6 space-y-4">
                   <div className="flex justify-between items-end mb-2">
                     <span className="text-sm font-medium text-white/80">{currentStep}</span>
                     <span className="text-sm font-mono text-primary">{progress}%</span>
                   </div>
                   <Progress value={progress} className="h-2 bg-white/10" />
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-md border border-white/10 bg-black/30 px-3 py-2">
+                      <div className="text-white/50">Found</div>
+                      <div className="font-mono text-white">{foundPairs.toLocaleString()} pairs</div>
+                    </div>
+                    <div className="rounded-md border border-white/10 bg-black/30 px-3 py-2">
+                      <div className="text-white/50">Formed</div>
+                      <div className="font-mono text-white">
+                        {formedPairs.toLocaleString()} / {foundPairs.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </Card>
             ) : null}
@@ -277,21 +322,33 @@ export default function ContextImporter() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <div className="text-sm text-white/60 mb-1">Initial Tokens</div>
+                  <div className="text-sm text-white/60 mb-1">Message Pairs</div>
+                  <div className="text-3xl font-mono font-bold text-white">
+                    {stats?.messagePairs.toLocaleString() || foundPairs.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-white/60 mb-1">Conversation Tokens</div>
                   <div className="text-3xl font-mono font-bold text-white">
                     {stats?.initialTokens.toLocaleString() || "0"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-white/60 mb-1">Tokens After</div>
+                  <div className="text-sm text-white/60 mb-1">Memory Tokens</div>
                   <div className="text-3xl font-mono font-bold text-primary">
                     {stats?.tokensAfter.toLocaleString() || "0"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-white/60 mb-1">Accuracy</div>
+                  <div className="text-sm text-white/60 mb-1">Tokens Saved</div>
                   <div className="text-3xl font-mono font-bold text-emerald-400">
-                    {stats?.accuracy ? `${stats.accuracy}%` : "-"}
+                    {stats?.savedTokens.toLocaleString() || "0"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-white/60 mb-1">Savings</div>
+                  <div className="text-3xl font-mono font-bold text-emerald-400">
+                    {stats ? `${stats.savingsPercent}%` : "-"}
                   </div>
                 </div>
 
