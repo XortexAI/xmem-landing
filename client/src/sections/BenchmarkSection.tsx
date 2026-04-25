@@ -237,7 +237,9 @@ function BenchmarkChart({
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             {competitors.map((c, idx) => (
               <div key={c.key} className="flex items-center gap-1.5">
-                {idx > 0 && <span className="text-white/20 text-xs mr-1">.</span>}
+                {idx > 0 && (
+                  <span className="text-white/20 text-xs mr-1">.</span>
+                )}
                 <div
                   className="w-3 h-3 rounded-[2px]"
                   style={{

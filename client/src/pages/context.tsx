@@ -19,8 +19,8 @@ export default function ContextImporter() {
   const [stats, setStats] = useState<{
     initialTokens: number;
     tokensAfter: number;
-    accuracy: number;
   } | null>(null);
+  const [liveStats, setLiveStats] = useState({ initialTokens: 0, tokensAfter: 0 });
   const [memories, setMemories] = useState<string[]>([]);
   const [isComplete, setIsComplete] = useState(false);
 
@@ -82,6 +82,8 @@ export default function ContextImporter() {
       let totalMemoriesTokens = 0;
       const allMemories: string[] = [];
 
+      setLiveStats({ initialTokens: 0, tokensAfter: 0 });
+
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i];
         setCurrentStep(`Processing message pair ${i + 1} of ${pairs.length}...`);
@@ -102,20 +104,21 @@ export default function ContextImporter() {
         if (ingestRes.ok) {
           const ingestData = await ingestRes.json();
 
-          const profileOps = ingestData.data?.profile?.operations || [];
-          const temporalOps = ingestData.data?.temporal?.operations || [];
-          const summaryOps = ingestData.data?.summary?.operations || [];
+          for (const domain of ["profile", "temporal", "summary"] as const) {
+            const domainResult = ingestData.data?.[domain];
+            if (!domainResult) continue;
 
-          const ops = [...profileOps, ...temporalOps, ...summaryOps];
-
-          ops.forEach((op) => {
-            if (op.content) {
-              allMemories.push(op.content);
-              totalMemoriesTokens += estimateTokens(op.content);
-            }
-          });
+            const ops = domainResult.operations || [];
+            ops.forEach((op: { type?: string; content?: string }) => {
+              if (op.content && op.type !== "noop" && op.type !== "delete") {
+                allMemories.push(op.content);
+                totalMemoriesTokens += estimateTokens(op.content);
+              }
+            });
+          }
         }
 
+        setLiveStats({ initialTokens: totalInitialTokens, tokensAfter: totalMemoriesTokens });
         setProgress(10 + Math.floor(((i + 1) / pairs.length) * 90));
       }
 
@@ -123,7 +126,6 @@ export default function ContextImporter() {
       setStats({
         initialTokens: totalInitialTokens,
         tokensAfter: totalMemoriesTokens,
-        accuracy: 98,
       });
       setIsComplete(true);
       setCurrentStep("Processing complete!");
@@ -164,16 +166,16 @@ export default function ContextImporter() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="dark min-h-screen bg-black text-white flex items-center justify-center">
         <Navbar />
-        <Loader2 className="h-10 w-10 animate-spin text-primary" aria-label="Loading" />
+        <Loader2 className="h-10 w-10 animate-spin text-white" aria-label="Loading" />
       </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-black text-white selection:bg-primary/30">
+      <div className="dark min-h-screen bg-black text-white selection:bg-primary/30">
         <Navbar />
         <main className="container mx-auto px-4 pt-32 pb-16 max-w-lg">
           <Card className="bg-white/5 border-white/10 backdrop-blur-xl">
@@ -195,7 +197,7 @@ export default function ContextImporter() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-primary/30">
+    <div className="dark min-h-screen bg-black text-white selection:bg-primary/30">
       <Navbar />
 
       <main className="container mx-auto px-4 pt-32 pb-16 max-w-4xl">
@@ -279,19 +281,28 @@ export default function ContextImporter() {
                 <div>
                   <div className="text-sm text-white/60 mb-1">Initial Tokens</div>
                   <div className="text-3xl font-mono font-bold text-white">
-                    {stats?.initialTokens.toLocaleString() || "0"}
+                    {(stats?.initialTokens ?? liveStats.initialTokens).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-white/60 mb-1">Tokens After</div>
-                  <div className="text-3xl font-mono font-bold text-primary">
-                    {stats?.tokensAfter.toLocaleString() || "0"}
+                  <div className="text-3xl font-mono font-bold text-blue-400">
+                    {(stats?.tokensAfter ?? liveStats.tokensAfter).toLocaleString()}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-white/60 mb-1">Accuracy</div>
+                  <div className="text-sm text-white/60 mb-1">Compression</div>
                   <div className="text-3xl font-mono font-bold text-emerald-400">
-                    {stats?.accuracy ? `${stats.accuracy}%` : "-"}
+                    {(() => {
+                      const initial = stats?.initialTokens ?? liveStats.initialTokens;
+                      const after = stats?.tokensAfter ?? liveStats.tokensAfter;
+                      if (after > 0 && initial > 0) {
+                        return `${(initial / after).toFixed(1)}x`;
+                      }
+                      return isProcessing ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+                      ) : "-";
+                    })()}
                   </div>
                 </div>
 
