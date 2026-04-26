@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
+const ACTIVE_PROJECT_STORAGE_KEY = "xmem.enterprise.activeProjectId";
 
 function authBearerHeaders(token: string | null): HeadersInit {
   if (!token) return {};
@@ -86,6 +87,8 @@ interface ChatMessage {
   annotations?: Annotation[];
   toolCalls?: any[];
 }
+
+type ScanPhase = "idle" | "phase1" | "phase2" | "complete" | "failed";
 
 // Role badge component
 function RoleBadge({ role }: { role: string }) {
@@ -161,11 +164,12 @@ export default function Enterprise() {
 
   // Scanner state
   const [isScanning, setIsScanning] = useState(false);
-  const [scanPhase, setScanPhase] = useState<"idle" | "phase1" | "phase2" | "complete" | "failed">("idle");
+  const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
   const [scanProgress, setScanProgress] = useState({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
   const [scanError, setScanError] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Check if user is manager
   const currentUserRole = useMemo(() => {
@@ -247,7 +251,13 @@ export default function Enterprise() {
         });
         const data = await resp.json();
         if (data.status === "ok" && Array.isArray(data.projects)) {
-          setProjects(data.projects.map((p: any) => ({ ...p, id: p.id || p._id })));
+          const loadedProjects = data.projects.map((p: any) => ({ ...p, id: p.id || p._id }));
+          setProjects(loadedProjects);
+          setActiveProject((prev) => {
+            if (prev) return prev;
+            const savedProjectId = window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
+            return loadedProjects.find((p: Project) => p.id === savedProjectId) || null;
+          });
         }
       } catch (e) {
         console.error("Failed to load projects:", e);
@@ -301,6 +311,97 @@ export default function Enterprise() {
     }
   };
 
+  const clearScanPolling = () => {
+    if (scanPollRef.current) {
+      clearInterval(scanPollRef.current);
+      scanPollRef.current = null;
+    }
+  };
+
+  const updateScanStateFromStatus = (data: any): boolean => {
+    const phase1Status = data?.phase1_status || "not_started";
+    const phase2Status = data?.phase2_status || "not_started";
+
+    if (data?.stats) {
+      setScanProgress({
+        files_processed: data.stats.files_processed || 0,
+        total_files: data.stats.total_files_to_process || 0,
+        symbols_indexed: data.stats.symbols_indexed || 0,
+      });
+    }
+
+    if (phase1Status === "complete" && phase2Status === "complete") {
+      setScanPhase("complete");
+      setIsScanning(false);
+      setScanError("");
+      return true;
+    }
+
+    if (phase1Status === "failed" || phase2Status === "failed") {
+      setScanPhase("failed");
+      setIsScanning(false);
+      setScanError(data?.error || "Scan failed. Please check the repository and try again.");
+      return true;
+    }
+
+    if (phase1Status === "complete") {
+      setScanPhase("phase2");
+      setIsScanning(true);
+      setScanError("");
+      return false;
+    }
+
+    if (phase1Status === "running" || phase1Status === "pending") {
+      setScanPhase("phase1");
+      setIsScanning(true);
+      setScanError("");
+      return false;
+    }
+
+    setScanPhase("idle");
+    setIsScanning(false);
+    return true;
+  };
+
+  const fetchScanStatusForProject = async (project: Project): Promise<boolean> => {
+    const resp = await fetch(
+      `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(project.org_id)}&repo=${encodeURIComponent(project.repo)}`,
+      { headers: authBearerHeaders(token) }
+    );
+    const data = await resp.json();
+    return updateScanStateFromStatus(data);
+  };
+
+  const startScanStatusPolling = (project: Project) => {
+    clearScanPolling();
+
+    const poll = async () => {
+      try {
+        const done = await fetchScanStatusForProject(project);
+        if (done) clearScanPolling();
+      } catch (e) {
+        console.error("Failed to poll scan status:", e);
+      }
+    };
+
+    scanPollRef.current = setInterval(poll, 3000);
+    poll();
+  };
+
+  // Hydrate persisted scanner/catalog state when the active project changes.
+  useEffect(() => {
+    if (!activeProject || !token || !username.trim()) {
+      clearScanPolling();
+      return;
+    }
+
+    setScanProgress({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
+    setScanError("");
+    startScanStatusPolling(activeProject);
+
+    return clearScanPolling;
+  }, [activeProject?.id, activeProject?.org_id, activeProject?.repo, token, username]);
+
   // Create project
   const handleCreateProject = async () => {
     if (!newProjectName.trim() || !newProjectGithubUrl.trim()) return;
@@ -328,6 +429,7 @@ export default function Enterprise() {
         const newProject = { ...data.project, id: data.project.id || data.project._id };
         setProjects([...projects, newProject]);
         setActiveProject(newProject);
+        window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, newProject.id);
         setShowCreateProject(false);
         setNewProjectName("");
         setNewProjectGithubUrl("");
@@ -368,7 +470,18 @@ export default function Enterprise() {
 
       const data = await resp.json();
       if (data.status === "ok") {
-        pollScanStatusForProject(project);
+        updateScanStateFromStatus(data);
+        startScanStatusPolling(project);
+        if (data.reused && data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `scan-reused-${Date.now()}`,
+              role: "status",
+              content: data.message || "Repository is already scanned and ready.",
+            },
+          ]);
+        }
       } else {
         setScanError(data.error || "Failed to start scan");
         setIsScanning(false);
@@ -380,52 +493,6 @@ export default function Enterprise() {
       setIsScanning(false);
       setScanPhase("idle");
     }
-  };
-
-  // Poll scan status for a specific project
-  const pollScanStatusForProject = async (project: Project) => {
-    const interval = setInterval(async () => {
-      try {
-        const resp = await fetch(
-          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(project.org_id)}&repo=${encodeURIComponent(project.repo)}`,
-          { headers: authBearerHeaders(token) }
-        );
-
-        const data = await resp.json();
-        
-        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
-          setScanPhase("complete");
-          setIsScanning(false);
-          clearInterval(interval);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `scan-complete-${Date.now()}`,
-              role: "status",
-              content: "Repository scan complete! You can now chat and add annotations.",
-            },
-          ]);
-        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
-          setScanError("Scan failed. Please check the repository and try again.");
-          setScanPhase("failed");
-          setIsScanning(false);
-          clearInterval(interval);
-        } else {
-          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
-          if (data.stats) {
-            setScanProgress({
-              files_processed: data.stats.files_processed || 0,
-              total_files: data.stats.total_files_to_process || 0,
-              symbols_indexed: data.stats.symbols_indexed || 0,
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to poll scan status:", e);
-      }
-    }, 3000);
-
-    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
   // Lookup user by username
@@ -576,8 +643,18 @@ export default function Enterprise() {
 
       const data = await resp.json();
       if (data.status === "ok") {
-        // Start polling for scan status
-        pollScanStatus();
+        updateScanStateFromStatus(data);
+        startScanStatusPolling(activeProject);
+        if (data.reused && data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `scan-reused-${Date.now()}`,
+              role: "status",
+              content: data.message || "Repository is already scanned and ready.",
+            },
+          ]);
+        }
       } else {
         setScanError(data.error || "Failed to start scan");
         setIsScanning(false);
@@ -589,56 +666,6 @@ export default function Enterprise() {
       setIsScanning(false);
       setScanPhase("idle");
     }
-  };
-
-  // Poll scan status
-  const pollScanStatus = async () => {
-    if (!activeProject) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const resp = await fetch(
-          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(activeProject.org_id)}&repo=${encodeURIComponent(activeProject.repo)}`,
-          { headers: authBearerHeaders(token) }
-        );
-
-        const data = await resp.json();
-        
-        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
-          setScanPhase("complete");
-          setIsScanning(false);
-          clearInterval(interval);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `scan-complete-${Date.now()}`,
-              role: "status",
-              content: "Scan complete! Repository is now ready for chat and annotations.",
-            },
-          ]);
-        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
-          setScanError("Scan failed. Please check the repository and try again.");
-          setScanPhase("idle");
-          setIsScanning(false);
-          clearInterval(interval);
-        } else {
-          // Update progress
-          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
-          if (data.stats) {
-            setScanProgress({
-              files_processed: data.stats.files_processed || 0,
-              total_files: data.stats.total_files_to_process || 0,
-              symbols_indexed: data.stats.symbols_indexed || 0,
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to poll scan status:", e);
-      }
-    }, 3000);
-
-    // Clear interval after 10 minutes (max scan time)
-    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
   // Create annotation
@@ -959,6 +986,7 @@ export default function Enterprise() {
                   key={project.id}
                   onClick={() => {
                     setActiveProject(project);
+                    window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, project.id);
                     setActiveTab("chat");
                     setMessages([]);
                     loadAnnotationsForProject(project.id);
@@ -1045,7 +1073,10 @@ export default function Enterprise() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setActiveProject(null)}
+                  onClick={() => {
+                    setActiveProject(null);
+                    window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+                  }}
                   className="text-xs text-white/30 hover:text-white/60 transition-colors"
                 >
                   Close
