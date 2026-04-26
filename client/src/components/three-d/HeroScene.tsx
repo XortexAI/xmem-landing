@@ -173,7 +173,7 @@ export function HeroScene() {
           key={i}
           index={i}
           position={pos}
-          size={i === 0 ? 0.14 : 0.07 + Math.random() * 0.04}
+          size={i === 0 ? 0.14 : 0.07 + (i % 5) * 0.008}
           delay={i * 0.5}
         />
       ))}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { HeroScene } from "../components/three-d/HeroScene";
 import { Navbar } from "../sections/Navbar";
 import { HeroSection } from "../sections/HeroSection";
@@ -21,21 +22,20 @@ import { Footer } from "../sections/Footer";
 import { BrainOverlay } from "../components/BrainOverlay";
 
 export default function Home() {
-  const [canvasOpacity, setCanvasOpacity] = useState(1);
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window === "undefined" ? 800 : window.innerHeight,
+  );
+  const { scrollY } = useScroll();
+  const canvasOpacity = useTransform(
+    scrollY,
+    [viewportHeight * 0.8, viewportHeight * 1.18],
+    [1, 0],
+  );
 
   useEffect(() => {
-    const handleScroll = () => {
-      const vh = window.innerHeight;
-      const scroll = window.scrollY;
-      const opacity = Math.max(
-        0,
-        1 - Math.max(0, scroll - vh * 1.5) / (vh * 0.5),
-      );
-      setCanvasOpacity(opacity);
-    };
-    window.addEventListener("scroll", handleScroll);
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    const onResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   return (
@@ -45,7 +45,7 @@ export default function Home() {
     >
       <BrainOverlay />
 
-      <div
+      <motion.div
         className="fixed inset-0 pointer-events-none"
         style={{ zIndex: 0, opacity: canvasOpacity }}
       >
@@ -61,7 +61,7 @@ export default function Home() {
             speed={0.3}
           />
         </Canvas>
-      </div>
+      </motion.div>
 
       <div className="relative z-10">
         <Navbar />
