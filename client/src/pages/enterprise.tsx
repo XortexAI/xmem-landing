@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   ArrowLeft,
   Send,
@@ -16,6 +16,7 @@ import {
   Info,
   X,
   ChevronRight,
+  ChevronDown,
   Shield,
   User,
   Crown,
@@ -25,6 +26,8 @@ import {
   MoreVertical,
   Trash2,
   Edit3,
+  BookmarkPlus,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -69,7 +72,8 @@ interface TeamMember {
 interface Annotation {
   id: string;
   content: string;
-  annotation_type: "bug_report" | "fix" | "explanation" | "warning" | "feature_idea";
+  annotation_type: "bug_report" | "fix" | "explanation" | "warning" | "feature_idea" | "instruction" | "architecture" | "best_practice" | "todo" | "technical_debt";
+  author_id?: string;
   author_name: string;
   author_role: string;
   severity?: "low" | "medium" | "high" | "critical";
@@ -77,6 +81,8 @@ interface Annotation {
   symbol_name?: string;
   created_at: string;
   score?: number;
+  assigned_to?: string;
+  assigned_to_name?: string;
 }
 
 interface ChatMessage {
@@ -115,6 +121,11 @@ function AnnotationTypeIcon({ type }: { type: string }) {
     explanation: { icon: Info, color: "text-blue-400" },
     warning: { icon: AlertCircle, color: "text-yellow-400" },
     feature_idea: { icon: Lightbulb, color: "text-purple-400" },
+    instruction: { icon: Info, color: "text-amber-400" },
+    architecture: { icon: Code, color: "text-indigo-400" },
+    best_practice: { icon: CheckCircle, color: "text-teal-400" },
+    todo: { icon: AlertCircle, color: "text-orange-400" },
+    technical_debt: { icon: AlertCircle, color: "text-rose-400" },
   };
 
   const config = iconConfig[type] || iconConfig.explanation;
@@ -143,8 +154,17 @@ export default function Enterprise() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAnnotationPanel, setShowAnnotationPanel] = useState(false);
   const [showEditMember, setShowEditMember] = useState<TeamMember | null>(null);
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
+  const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "annotations" | "team">("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Text selection → annotation
+  const [selectedTextForAnnotation, setSelectedTextForAnnotation] = useState("");
+  const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number } | null>(null);
+  // Assignment
+  const [newAnnotationAssignedTo, setNewAnnotationAssignedTo] = useState<{ id: string; username: string } | null>(null);
+  // Disambiguation: when auto-extracted annotation has assigned_to_name but multiple matches exist
+  const [pendingAssignment, setPendingAssignment] = useState<{ annotationId: string; roleName: string; candidates: TeamMember[] } | null>(null);
 
   // Form state
   const [newProjectName, setNewProjectName] = useState("");
@@ -159,6 +179,8 @@ export default function Enterprise() {
   const [newAnnotationContent, setNewAnnotationContent] = useState("");
   const [newAnnotationType, setNewAnnotationType] = useState<Annotation["annotation_type"]>("explanation");
   const [newAnnotationTarget, setNewAnnotationTarget] = useState("");
+  // collapsed state for "Relevant Team Knowledge" sections: keyed by message id
+  const [collapsedAnnotationMsgs, setCollapsedAnnotationMsgs] = useState<Record<string, boolean>>({});
 
   // Scanner state
   const [isScanning, setIsScanning] = useState(false);
@@ -167,6 +189,46 @@ export default function Enterprise() {
   const [scanError, setScanError] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Global mouseup listener for text-selection → annotation popup
+  useEffect(() => {
+    const handleMouseUp = (e: MouseEvent) => {
+      // Small delay so selection is fully committed
+      setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || selection.toString().trim().length < 10) {
+          setSelectionPopup(null);
+          return;
+        }
+        // Only show popup if selection is inside the chat container
+        const container = chatContainerRef.current;
+        if (!container) { setSelectionPopup(null); return; }
+        const anchorNode = selection.anchorNode;
+        if (!container.contains(anchorNode)) { setSelectionPopup(null); return; }
+        const text = selection.toString().trim();
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectedTextForAnnotation(text);
+        setSelectionPopup({ x: rect.left + rect.width / 2, y: rect.top - 10 });
+      }, 10);
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      // Clear popup when clicking outside the floating button
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-selection-popup]')) {
+        setSelectionPopup(null);
+      }
+    };
+
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('click', handleClick, { capture: true });
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('click', handleClick, { capture: true });
+    };
+  }, []);
 
   // Check if user is manager
   const currentUserRole = useMemo(() => {
@@ -258,6 +320,54 @@ export default function Enterprise() {
 
     loadTeam();
   }, [activeProject, token]);
+
+  // Check scan status when project changes (including on page reload)
+  useEffect(() => {
+    if (!activeProject || !token || !username) return;
+
+    const checkScanStatus = async () => {
+      try {
+        console.log("[Enterprise] Checking scan status for", activeProject.org_id, activeProject.repo);
+        const resp = await fetch(
+          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(activeProject.org_id)}&repo=${encodeURIComponent(activeProject.repo)}`,
+          { headers: authBearerHeaders(token) }
+        );
+        const data = await resp.json();
+        console.log("[Enterprise] Scan status response:", data);
+
+        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setScanPhase("complete");
+          setIsScanning(false);
+          setScanError("");
+          console.log("[Enterprise] Repo already scanned — chat enabled");
+        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
+          setScanPhase("failed");
+          setIsScanning(false);
+          setScanError("Previous scan failed. Please try scanning again.");
+          console.log("[Enterprise] Previous scan failed");
+        } else if (data.phase1_status === "running" || data.phase2_status === "running") {
+          // Scan is still in progress — start polling
+          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
+          setIsScanning(true);
+          setScanError("");
+          console.log("[Enterprise] Scan in progress — starting poll");
+          pollScanStatusForProject(activeProject);
+        } else {
+          // Not started or unknown — show idle
+          setScanPhase("idle");
+          setIsScanning(false);
+          setScanError("");
+          console.log("[Enterprise] Scan not started — showing idle");
+        }
+      } catch (e) {
+        console.error("[Enterprise] Failed to check scan status:", e);
+        // Default to idle so user can trigger scan manually
+        setScanPhase("idle");
+      }
+    };
+
+    checkScanStatus();
+  }, [activeProject, token, username]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -621,41 +731,168 @@ export default function Enterprise() {
     setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
-  // Create annotation
+  // Create or Update annotation
   const handleCreateAnnotation = async () => {
     if (!activeProject || !newAnnotationContent.trim()) return;
 
     try {
-      const resp = await fetch(
-        `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations`,
-        {
-          method: "POST",
-          headers: authJsonHeaders(token),
-          body: JSON.stringify({
-            content: newAnnotationContent,
-            annotation_type: newAnnotationType,
-            file_path: newAnnotationTarget || undefined,
-          }),
+      if (editingAnnotation) {
+        const resp = await fetch(
+          `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations/${editingAnnotation.id}`,
+          {
+            method: "PATCH",
+            headers: authJsonHeaders(token),
+            body: JSON.stringify({ content: newAnnotationContent }),
+          }
+        );
+        const data = await resp.json();
+        if (data.status === "ok") {
+          setNewAnnotationContent("");
+          setNewAnnotationTarget("");
+          setShowAnnotationPanel(false);
+          setEditingAnnotation(null);
+          setNewAnnotationAssignedTo(null);
+          loadAnnotationsForProject(activeProject.id);
         }
-      );
-
-      const data = await resp.json();
-      if (data.status === "ok") {
-        setNewAnnotationContent("");
-        setNewAnnotationTarget("");
-        setShowAnnotationPanel(false);
-        // Refresh annotations
-        loadAnnotationsForProject(activeProject.id);
+      } else {
+        const body: Record<string, any> = {
+          content: newAnnotationContent,
+          annotation_type: newAnnotationType,
+          file_path: newAnnotationTarget || undefined,
+        };
+        if (newAnnotationAssignedTo && (newAnnotationType === "instruction" || newAnnotationType === "todo")) {
+          body.assigned_to = newAnnotationAssignedTo.id;
+          body.assigned_to_name = newAnnotationAssignedTo.username;
+        }
+        const resp = await fetch(
+          `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations`,
+          { method: "POST", headers: authJsonHeaders(token), body: JSON.stringify(body) }
+        );
+        const data = await resp.json();
+        if (data.status === "ok") {
+          setNewAnnotationContent("");
+          setNewAnnotationTarget("");
+          setNewAnnotationAssignedTo(null);
+          setSelectedTextForAnnotation("");
+          setShowAnnotationPanel(false);
+          loadAnnotationsForProject(activeProject.id);
+        }
       }
     } catch (e) {
-      console.error("Failed to create annotation:", e);
+      console.error("Failed to save annotation:", e);
     }
   };
+
+  const handleEditAnnotation = (ann: Annotation) => {
+    setEditingAnnotation(ann);
+    setNewAnnotationContent(ann.content);
+    setNewAnnotationType(ann.annotation_type);
+    setNewAnnotationTarget(ann.file_path || "");
+    setNewAnnotationAssignedTo(
+      ann.assigned_to && ann.assigned_to_name
+        ? { id: ann.assigned_to, username: ann.assigned_to_name }
+        : null
+    );
+    setShowAnnotationPanel(true);
+  };
+
+  const openAnnotationFromSelection = () => {
+    if (!selectedTextForAnnotation) return;
+    setNewAnnotationContent(selectedTextForAnnotation);
+    setNewAnnotationType("explanation");
+    setNewAnnotationTarget("");
+    setNewAnnotationAssignedTo(null);
+    setEditingAnnotation(null);
+    setShowAnnotationPanel(true);
+    setSelectionPopup(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleDeleteAnnotation = async (ann: Annotation) => {
+    if (!activeProject) return;
+    if (!window.confirm("Delete this annotation? This cannot be undone.")) return;
+    try {
+      const resp = await fetch(
+        `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations/${ann.id}`,
+        { method: "DELETE", headers: authBearerHeaders(token) }
+      );
+      const data = await resp.json();
+      if (data.status === "ok") {
+        setAnnotations(prev => prev.filter(a => a.id !== ann.id));
+      }
+    } catch (e) {
+      console.error("Failed to delete annotation:", e);
+    }
+  };
+
+  // After auto-extraction: resolve fuzzy assigned_to_name to a real team member
+  const handleAnnotationsCreated = useCallback((roleName: string, ids: string[]) => {
+    if (!roleName || !ids.length) return;
+    const lower = roleName.toLowerCase();
+    // Try exact username match first
+    const exact = teamMembers.find(m => m.username.toLowerCase() === lower);
+    if (exact) {
+      // Patch the annotation with the exact user_id
+      ids.forEach(async (annId) => {
+        if (!activeProject) return;
+        await fetch(
+          `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations/${annId}`,
+          {
+            method: "PATCH",
+            headers: authJsonHeaders(token),
+            body: JSON.stringify({ assigned_to: exact.user_id, assigned_to_name: exact.username }),
+          }
+        );
+      });
+      loadAnnotationsForProject(activeProject!.id);
+      return;
+    }
+    // Try role match (e.g., "intern" matches all interns)
+    const byRole = teamMembers.filter(m => m.role.toLowerCase() === lower || m.username.toLowerCase().includes(lower));
+    if (byRole.length === 1) {
+      // Only one match — auto-assign
+      const m = byRole[0];
+      ids.forEach(async (annId) => {
+        if (!activeProject) return;
+        await fetch(
+          `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations/${annId}`,
+          {
+            method: "PATCH",
+            headers: authJsonHeaders(token),
+            body: JSON.stringify({ assigned_to: m.user_id, assigned_to_name: m.username }),
+          }
+        );
+      });
+      loadAnnotationsForProject(activeProject!.id);
+    } else if (byRole.length > 1) {
+      // Multiple matches — show disambiguation modal
+      setPendingAssignment({ annotationId: ids[0], roleName, candidates: byRole });
+    } else {
+      // No match — still refresh to show with just the name
+      loadAnnotationsForProject(activeProject!.id);
+    }
+  }, [teamMembers, activeProject, token]);
+
+  const assignPendingAnnotation = async (member: TeamMember) => {
+    if (!pendingAssignment || !activeProject) return;
+    await fetch(
+      `${API_URL}/v1/enterprise/projects/${activeProject.id}/annotations/${pendingAssignment.annotationId}`,
+      {
+        method: "PATCH",
+        headers: authJsonHeaders(token),
+        body: JSON.stringify({ assigned_to: member.user_id, assigned_to_name: member.username }),
+      }
+    );
+    setPendingAssignment(null);
+    loadAnnotationsForProject(activeProject.id);
+  };
+
 
   // Load annotations for project
   const loadAnnotationsForProject = async (projectId: string) => {
     if (!token) return;
 
+    setLoadingAnnotations(true);
     try {
       const resp = await fetch(
         `${API_URL}/v1/enterprise/projects/${projectId}/annotations/search`,
@@ -671,6 +908,8 @@ export default function Enterprise() {
       }
     } catch (e) {
       console.error("Failed to load annotations:", e);
+    } finally {
+      setLoadingAnnotations(false);
     }
   };
 
@@ -729,28 +968,69 @@ export default function Enterprise() {
             const chunk = JSON.parse(line);
 
             if (chunk.type === "annotations") {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: `annotations-${Date.now()}`,
-                  role: "annotations",
-                  content: "",
-                  annotations: chunk.annotations,
-                },
-              ]);
+              // Insert annotations BEFORE the assistant message so the
+              // assistant bubble always stays last and text chunks work.
+              setMessages((prev) => {
+                const assistantIdx = prev.findIndex((m) => m.id === assistantId);
+                if (assistantIdx >= 0) {
+                  const before = prev.slice(0, assistantIdx);
+                  const after = prev.slice(assistantIdx);
+                  return [
+                    ...before,
+                    {
+                      id: `annotations-${Date.now()}`,
+                      role: "annotations" as const,
+                      content: "",
+                      annotations: chunk.annotations,
+                    },
+                    ...after,
+                  ];
+                }
+                // Fallback: append at end
+                return [
+                  ...prev,
+                  {
+                    id: `annotations-${Date.now()}`,
+                    role: "annotations" as const,
+                    content: "",
+                    annotations: chunk.annotations,
+                  },
+                ];
+              });
             } else if (chunk.type === "chunk") {
               const textToAdd = chunk.text || "";
               if (textToAdd) {
                 setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  if (last.id === assistantId) {
-                    return [
-                      ...prev.slice(0, -1),
-                      { ...last, content: last.content + textToAdd },
-                    ];
+                  // Find assistant message by ID instead of assuming it's last
+                  const idx = prev.findIndex((m) => m.id === assistantId);
+                  if (idx >= 0) {
+                    const updated = { ...prev[idx], content: prev[idx].content + textToAdd };
+                    return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
                   }
                   return prev;
                 });
+              }
+            } else if (chunk.type === "annotations_created") {
+              // Auto-extracted annotation — show confirmation in chat
+              const count = chunk.count || chunk.ids?.length || 0;
+              const assignee = chunk.assigned_to_name;
+              let statusText = `✅ ${count} annotation${count > 1 ? "s" : ""} saved to team knowledge`;
+              if (assignee) {
+                statusText += ` — assigned to "${assignee}"`;
+              }
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `status-ann-${Date.now()}`,
+                  role: "status" as const,
+                  content: statusText,
+                },
+              ]);
+              // Try to resolve fuzzy assigned_to_name
+              if (assignee && chunk.ids?.length) {
+                handleAnnotationsCreated(assignee, chunk.ids);
+              } else if (chunk.ids?.length) {
+                loadAnnotationsForProject(activeProject!.id);
               }
             }
           } catch {
@@ -760,12 +1040,10 @@ export default function Enterprise() {
       }
     } catch (e) {
       setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last.id === assistantId) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: "Failed to get response. Please try again." },
-          ];
+        const idx = prev.findIndex((m) => m.id === assistantId);
+        if (idx >= 0) {
+          const updated = { ...prev[idx], content: "Failed to get response. Please try again." };
+          return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
         }
         return prev;
       });
@@ -983,7 +1261,7 @@ export default function Enterprise() {
               </div>
 
               {/* Tab Content */}
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0">
                 {/* CHAT TAB */}
                 {activeTab === "chat" && (
                   <div className="flex flex-col h-full">
@@ -1078,7 +1356,7 @@ export default function Enterprise() {
                     )}
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                    <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
                       {messages.length === 0 && (
                         <div className="text-center py-12">
                           <MessageSquare className="w-10 h-10 text-white/10 mx-auto mb-4" />
@@ -1102,11 +1380,36 @@ export default function Enterprise() {
                         </div>
                       )}
 
+                {/* Selection popup — fixed to viewport */}
+                {selectionPopup && (
+                  <div
+                    data-selection-popup
+                    className="fixed z-[9999] transform -translate-x-1/2 -translate-y-full pointer-events-auto"
+                    style={{ left: selectionPopup.x, top: selectionPopup.y }}
+                  >
+                    <button
+                      data-selection-popup
+                      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); openAnnotationFromSelection(); }}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg shadow-2xl border border-purple-400/40 transition-colors font-medium"
+                    >
+                      <BookmarkPlus className="w-3.5 h-3.5" />
+                      Save as Annotation
+                    </button>
+                    <div className="w-2.5 h-2.5 bg-purple-600 rotate-45 mx-auto -mt-1.5" />
+                  </div>
+                )}
+
                 {messages.map((msg) => {
                   if (msg.role === "status") {
+                    const isAnnotationConfirm = msg.content.startsWith("✅");
                     return (
                       <div key={msg.id} className="flex justify-center my-2">
-                        <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] text-white/30 uppercase tracking-widest">
+                        <div className={`px-4 py-2 rounded-xl border flex items-center gap-2 ${
+                          isAnnotationConfirm
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 text-xs"
+                            : "bg-white/5 border-white/5 text-white/30 text-[10px] uppercase tracking-widest"
+                        }`}>
+                          {isAnnotationConfirm && <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />}
                           {msg.content}
                         </div>
                       </div>
@@ -1114,26 +1417,41 @@ export default function Enterprise() {
                   }
 
                   if (msg.role === "annotations") {
+                    const isCollapsed = collapsedAnnotationMsgs[msg.id] !== false; // default collapsed
                     return (
-                      <div key={msg.id} className="my-4">
-                        <div className="text-[10px] text-white/30 uppercase tracking-widest mb-2">Relevant Team Knowledge</div>
-                        <div className="space-y-2">
-                          {msg.annotations?.map((ann) => (
-                            <div key={ann.id} className="p-3 bg-white/[0.03] rounded-lg border border-white/5">
-                              <div className="flex items-start gap-2">
-                                <AnnotationTypeIcon type={ann.annotation_type} />
-                                <div className="flex-1">
-                                  <p className="text-xs text-white/70">{ann.content}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-[10px] text-white/40">
-                                    <span>{ann.author_name}</span>
-                                    <span>•</span>
-                                    <RoleBadge role={ann.author_role} />
+                      <div key={msg.id} className="my-3">
+                        <button
+                          onClick={() => setCollapsedAnnotationMsgs(prev => ({ ...prev, [msg.id]: !isCollapsed }))}
+                          className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest hover:text-white/50 transition-colors group mb-1"
+                        >
+                          {isCollapsed
+                            ? <ChevronRight className="w-3 h-3 group-hover:text-white/50" />
+                            : <ChevronDown className="w-3 h-3 group-hover:text-white/50" />
+                          }
+                          Relevant Team Knowledge
+                          <span className="text-white/20 normal-case tracking-normal capitalize">
+                            ({msg.annotations?.length ?? 0})
+                          </span>
+                        </button>
+                        {!isCollapsed && (
+                          <div className="space-y-2 mt-2">
+                            {msg.annotations?.map((ann) => (
+                              <div key={ann.id} className="p-3 bg-white/[0.03] rounded-lg border border-white/5">
+                                <div className="flex items-start gap-2">
+                                  <AnnotationTypeIcon type={ann.annotation_type} />
+                                  <div className="flex-1">
+                                    <p className="text-xs text-white/70">{ann.content}</p>
+                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-white/40">
+                                      <span>{ann.author_name}</span>
+                                      <span>•</span>
+                                      <RoleBadge role={ann.author_role} />
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -1148,7 +1466,7 @@ export default function Enterprise() {
                             : "bg-white/5 text-white/80 border border-white/10"
                         }`}
                       >
-                        <div className="text-sm font-light leading-relaxed">
+                        <div className="text-sm font-light leading-relaxed select-text">
                           {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
                         </div>
 
@@ -1165,12 +1483,21 @@ export default function Enterprise() {
                             ))}
                           </div>
                         )}
+
+                        {/* Hint shown below completed assistant messages */}
+                        {!isUser && msg.content && !chatLoading && (
+                          <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-1 text-[10px] text-white/20">
+                            <BookmarkPlus className="w-3 h-3" />
+                            Select text to save as annotation
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
                 <div ref={chatEndRef} />
               </div>
+
 
               {/* Chat Input */}
               <div className="px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
@@ -1214,7 +1541,12 @@ export default function Enterprise() {
                         <p className="text-xs text-white/40 mt-0.5">Knowledge shared by your team</p>
                       </div>
                       <button
-                        onClick={() => setShowAnnotationPanel(true)}
+                        onClick={() => {
+                          setEditingAnnotation(null);
+                          setNewAnnotationContent("");
+                          setNewAnnotationTarget("");
+                          setShowAnnotationPanel(true);
+                        }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-white transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" /> Add Annotation
@@ -1223,13 +1555,23 @@ export default function Enterprise() {
 
                     {/* Annotations List */}
                     <div className="flex-1 overflow-y-auto px-4 py-4">
-                      {annotations.length === 0 ? (
+                      {loadingAnnotations ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <Loader2 className="w-8 h-8 text-white/20 animate-spin mb-4" />
+                          <p className="text-sm text-white/40">Loading team knowledge...</p>
+                        </div>
+                      ) : annotations.length === 0 ? (
                         <div className="text-center py-12">
                           <FileText className="w-10 h-10 text-white/10 mx-auto mb-4" />
                           <p className="text-sm text-white/30">No annotations yet.</p>
                           <p className="text-xs text-white/20 mt-2">Add annotations to share knowledge with your team.</p>
                           <button
-                            onClick={() => setShowAnnotationPanel(true)}
+                            onClick={() => {
+                              setEditingAnnotation(null);
+                              setNewAnnotationContent("");
+                              setNewAnnotationTarget("");
+                              setShowAnnotationPanel(true);
+                            }}
                             className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-xs text-white hover:bg-white/20 transition-colors"
                           >
                             Add First Annotation
@@ -1237,38 +1579,77 @@ export default function Enterprise() {
                         </div>
                       ) : (
                         <div className="space-y-3 max-w-3xl">
-                          {annotations.map((ann) => (
-                            <div key={ann.id} className="p-4 bg-white/[0.03] rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-                              <div className="flex items-start gap-3">
-                                <div className="flex-shrink-0 mt-0.5">
-                                  <AnnotationTypeIcon type={ann.annotation_type} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-white/80 leading-relaxed">{ann.content}</p>
-                                  <div className="flex items-center gap-3 mt-3 text-[11px] text-white/40">
-                                    <span className="text-white/60">{ann.author_name}</span>
-                                    <RoleBadge role={ann.author_role} />
-                                    {ann.file_path && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="font-mono text-white/30">{ann.file_path}</span>
-                                      </>
-                                    )}
-                                    {ann.symbol_name && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="font-mono text-white/30">{ann.symbol_name}</span>
-                                      </>
-                                    )}
+                          {annotations.map((ann) => {
+                            const isAssignedToMe = ann.assigned_to === userId;
+                            const isAssigned = !!ann.assigned_to_name;
+                            return (
+                              <div
+                                key={ann.id}
+                                className={`p-4 rounded-lg border transition-colors group ${
+                                  isAssignedToMe
+                                    ? "bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50"
+                                    : "bg-white/[0.03] border-white/10 hover:border-white/20"
+                                }`}
+                              >
+                                {/* Assignee banner */}
+                                {isAssigned && (
+                                  <div className={`flex items-center gap-1.5 text-[10px] mb-2 pb-2 border-b ${isAssignedToMe ? "border-amber-500/20 text-amber-400" : "border-white/5 text-white/30"}`}>
+                                    <User className="w-3 h-3" />
+                                    {isAssignedToMe ? "Assigned to you" : `Assigned to ${ann.assigned_to_name}`}
                                   </div>
-                                  <div className="text-[10px] text-white/20 mt-2">
-                                    {new Date(ann.created_at).toLocaleDateString()}
+                                )}
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                    <div className="flex-shrink-0 mt-0.5">
+                                      <AnnotationTypeIcon type={ann.annotation_type} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-white/80 leading-relaxed">{ann.content}</p>
+                                      <div className="flex items-center gap-3 mt-3 text-[11px] text-white/40">
+                                        <span className="text-white/60">{ann.author_name}</span>
+                                        <RoleBadge role={ann.author_role} />
+                                        {ann.file_path && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="font-mono text-white/30">{ann.file_path}</span>
+                                          </>
+                                        )}
+                                        {ann.symbol_name && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="font-mono text-white/30">{ann.symbol_name}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] text-white/20 mt-2">
+                                        {new Date(ann.created_at).toLocaleDateString()}
+                                      </div>
+                                    </div>
                                   </div>
+                                  {(currentUserRole === "manager" || ann.author_id === userId) && (
+                                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all">
+                                      <button
+                                        onClick={() => handleEditAnnotation(ann)}
+                                        title="Edit annotation"
+                                        className="p-2 hover:bg-white/10 rounded transition-colors text-white/40 hover:text-white"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteAnnotation(ann)}
+                                        title="Delete annotation"
+                                        className="p-2 hover:bg-red-500/20 rounded transition-colors text-white/40 hover:text-red-400"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
+
                       )}
                     </div>
                   </div>
@@ -1588,32 +1969,98 @@ export default function Enterprise() {
       {/* Create Annotation Modal */}
       {showAnnotationPanel && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111] rounded-xl border border-white/10 w-full max-w-lg p-6">
+          <div className="bg-[#111] rounded-xl border border-white/10 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg text-white font-medium">Add Annotation</h2>
-              <button onClick={() => setShowAnnotationPanel(false)} className="text-white/40 hover:text-white">
+              <div>
+                <h2 className="text-lg text-white font-medium">
+                  {editingAnnotation ? "Edit Annotation" : selectedTextForAnnotation ? "Save as Annotation" : "Add Annotation"}
+                </h2>
+                {selectedTextForAnnotation && !editingAnnotation && (
+                  <p className="text-xs text-white/40 mt-0.5">From selected response text</p>
+                )}
+              </div>
+              <button onClick={() => {
+                setShowAnnotationPanel(false);
+                setEditingAnnotation(null);
+                setNewAnnotationContent("");
+                setNewAnnotationTarget("");
+                setNewAnnotationAssignedTo(null);
+                setSelectedTextForAnnotation("");
+              }} className="text-white/40 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
+              {/* Type selector */}
               <div>
                 <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["explanation", "warning", "bug_report", "fix", "feature_idea"] as const).map((type) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {(["explanation", "warning", "bug_report", "fix", "feature_idea", "instruction", "architecture", "best_practice", "todo", "technical_debt"] as const).map((type) => (
                     <button
                       key={type}
-                      onClick={() => setNewAnnotationType(type)}
+                      onClick={() => {
+                        setNewAnnotationType(type);
+                        if (type !== "instruction" && type !== "todo") setNewAnnotationAssignedTo(null);
+                      }}
+                      disabled={!!editingAnnotation}
                       className={`px-3 py-2 rounded-lg text-xs capitalize transition-colors ${
                         newAnnotationType === type
                           ? "bg-white/20 text-white"
                           : "bg-white/5 text-white/60 hover:bg-white/10"
-                      }`}
+                      } ${editingAnnotation ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
-                      {type.replace("_", " ")}
+                      {type.replace(/_/g, " ")}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Assign To — only for instruction/todo types, only for managers */}
+              {!editingAnnotation && (newAnnotationType === "instruction" || newAnnotationType === "todo") && currentUserRole === "manager" && (
+                <div>
+                  <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">
+                    Assign To <span className="text-white/20 normal-case tracking-normal">(optional)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Unassigned option */}
+                    <button
+                      onClick={() => setNewAnnotationAssignedTo(null)}
+                      className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        !newAnnotationAssignedTo
+                          ? "bg-white/20 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      Everyone
+                    </button>
+                    {/* Team members */}
+                    {teamMembers.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => setNewAnnotationAssignedTo(
+                          newAnnotationAssignedTo?.id === m.user_id ? null : { id: m.user_id, username: m.username }
+                        )}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          newAnnotationAssignedTo?.id === m.user_id
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
+                        }`}
+                      >
+                        <User className="w-3 h-3" />
+                        {m.username}
+                        <span className="text-white/30 text-[10px]">({m.role.replace("_", " ")})</span>
+                      </button>
+                    ))}
+                  </div>
+                  {newAnnotationAssignedTo && (
+                    <p className="text-[11px] text-amber-400/70 mt-1.5">
+                      This {newAnnotationType} will be highlighted for <strong>{newAnnotationAssignedTo.username}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Target file/symbol */}
               <div>
                 <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Target (Optional)</label>
                 <input
@@ -1624,6 +2071,8 @@ export default function Enterprise() {
                   placeholder="e.g., src/utils/auth.ts or AuthService.login"
                 />
               </div>
+
+              {/* Content */}
               <div>
                 <label className="block text-xs text-white/40 uppercase tracking-widest mb-2">Content</label>
                 <textarea
@@ -1633,12 +2082,52 @@ export default function Enterprise() {
                   placeholder="Share your knowledge about this code..."
                 />
               </div>
+
               <button
                 onClick={handleCreateAnnotation}
                 disabled={!newAnnotationContent.trim()}
                 className="w-full py-3 bg-white text-black rounded-lg font-medium text-sm disabled:opacity-30"
               >
-                Create Annotation
+                {editingAnnotation ? "Save Changes" : "Create Annotation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disambiguation modal: resolve "intern" to a specific team member */}
+      {pendingAssignment && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] rounded-xl border border-amber-500/20 w-full max-w-sm p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <ClipboardList className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h2 className="text-base text-white font-medium">Who is this for?</h2>
+                <p className="text-xs text-white/50 mt-1">
+                  A task was created for <strong className="text-amber-300">"{pendingAssignment.roleName}"</strong>.
+                  Multiple people match — pick who should own it:
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {pendingAssignment.candidates.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => assignPendingAnnotation(m)}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/30 rounded-lg text-left transition-colors"
+                >
+                  <User className="w-4 h-4 text-amber-400" />
+                  <div>
+                    <div className="text-sm text-white font-medium">{m.username}</div>
+                    <div className="text-[10px] text-white/40 capitalize">{m.role.replace("_", " ")}</div>
+                  </div>
+                </button>
+              ))}
+              <button
+                onClick={() => { setPendingAssignment(null); loadAnnotationsForProject(activeProject!.id); }}
+                className="w-full py-2.5 text-white/40 text-xs hover:text-white transition-colors mt-2"
+              >
+                Leave unassigned
               </button>
             </div>
           </div>
