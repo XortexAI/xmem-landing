@@ -226,10 +226,10 @@ function BenchmarkChart({
 }) {
   return (
     <RevealSection delay={delay}>
-      <div className="p-6 md:p-10 relative overflow-hidden">
+      <div className="relative overflow-hidden rounded-md border border-white/10 bg-white/[0.015] p-4 sm:p-6 md:p-10">
         <div className="flex flex-col items-center gap-4 mb-8">
           <span
-            className="text-white font-bold text-xl md:text-2xl"
+            className="text-center text-white font-bold text-xl md:text-2xl"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             {title}
@@ -255,7 +255,81 @@ function BenchmarkChart({
           </div>
         </div>
 
-        <div className="relative pl-10 md:pl-12">
+        <div className="space-y-4 md:hidden">
+          {data.map((item) => {
+            const bestValue = Math.max(
+              ...competitors.map((comp) => {
+                const rawValue = item[comp.key];
+                return typeof rawValue === "number" && Number.isFinite(rawValue)
+                  ? rawValue
+                  : 0;
+              }),
+            );
+
+            return (
+              <div
+                key={item.label}
+                className="rounded-md border border-white/10 bg-black/30 p-4"
+              >
+                <div className="mb-4 text-sm font-semibold leading-snug text-white/80">
+                  {item.label.replace("\n", " ")}
+                </div>
+                <div className="space-y-3">
+                  {competitors.map((comp) => {
+                    const rawValue = item[comp.key];
+                    const value =
+                      typeof rawValue === "number" && Number.isFinite(rawValue)
+                        ? rawValue
+                        : 0;
+                    const isBest = value === bestValue;
+
+                    return (
+                      <div key={comp.key}>
+                        <div className="mb-1.5 flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div
+                              className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                              style={{
+                                background: comp.gradient,
+                                boxShadow: comp.dotGlow,
+                              }}
+                            />
+                            <span className="truncate text-xs font-semibold text-white/65">
+                              {comp.label}
+                            </span>
+                          </div>
+                          <span
+                            className={`shrink-0 text-xs font-bold ${
+                              isBest ? "text-white" : comp.textClass
+                            }`}
+                            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                          >
+                            {value.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${value}%` }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.8 }}
+                            className="h-full rounded-full"
+                            style={{
+                              background: comp.gradient,
+                              boxShadow: `0 0 10px ${comp.glow}`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="relative hidden pl-10 md:block md:pl-12">
           <div
             className="absolute left-0 top-0 bottom-10 w-10 md:w-12 flex flex-col justify-between items-end pr-2 text-xs text-white/40 z-10"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -350,12 +424,12 @@ function BenchmarkChart({
 export function BenchmarkSection() {
   return (
     <section
-      className="relative py-40 overflow-hidden"
+      className="relative overflow-hidden py-24 md:py-40"
       style={{ background: "#050505" }}
     >
       <div className="absolute inset-0 dot-pattern opacity-20" />
-      <div className="max-w-7xl mx-auto px-6 relative">
-        <RevealSection className="text-center mb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
+        <RevealSection className="text-center mb-14 md:mb-24">
           <div
             className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs text-white/50 uppercase tracking-widest"
             style={{ border: "1px solid rgba(255,255,255,0.08)" }}
@@ -363,14 +437,14 @@ export function BenchmarkSection() {
             Performance
           </div>
           <h2
-            className="text-5xl md:text-7xl font-bold text-white tracking-tight"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            className="text-4xl sm:text-5xl md:text-7xl font-bold text-white"
+            style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: 0 }}
           >
             Unmatched
             <br />
             <span className="text-white/30">Accuracy</span>
           </h2>
-          <p className="text-xl text-white/40 max-w-2xl mx-auto mt-6">
+          <p className="text-base sm:text-lg md:text-xl text-white/40 max-w-2xl mx-auto mt-6 leading-relaxed">
             Tested on LongMemEval-S and LoCoMo benchmarks. Xmem outperforms
             existing memory solutions and full-context models across all
             reasoning categories.

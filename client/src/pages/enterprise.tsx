@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
+const ACTIVE_PROJECT_STORAGE_KEY = "xmem.enterprise.activeProjectId";
 
 function authBearerHeaders(token: string | null): HeadersInit {
   if (!token) return {};
@@ -87,6 +88,8 @@ interface ChatMessage {
   toolCalls?: any[];
 }
 
+type ScanPhase = "idle" | "phase1" | "phase2" | "complete" | "failed";
+
 // Role badge component
 function RoleBadge({ role }: { role: string }) {
   const roleConfig: Record<string, { icon: any; color: string; label: string }> = {
@@ -136,7 +139,6 @@ export default function Enterprise() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
 
   // UI state
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -162,11 +164,12 @@ export default function Enterprise() {
 
   // Scanner state
   const [isScanning, setIsScanning] = useState(false);
-  const [scanPhase, setScanPhase] = useState<"idle" | "phase1" | "phase2" | "complete" | "failed">("idle");
+  const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
   const [scanProgress, setScanProgress] = useState({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
   const [scanError, setScanError] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Check if user is manager
   const currentUserRole = useMemo(() => {
@@ -216,6 +219,27 @@ export default function Enterprise() {
   // Legacy compatibility
   const isManager = useMemo(() => currentUserRole === "manager", [currentUserRole]);
 
+  const updateProjectAnnotationCount = (projectId: string, increment: number) => {
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              annotation_count: Math.max(0, (project.annotation_count || 0) + increment),
+            }
+          : project
+      )
+    );
+    setActiveProject((prev) =>
+      prev?.id === projectId
+        ? {
+            ...prev,
+            annotation_count: Math.max(0, (prev.annotation_count || 0) + increment),
+          }
+        : prev
+    );
+  };
+
   // Load projects
   useEffect(() => {
     if (!isAuthenticated || !token) return;
@@ -227,7 +251,13 @@ export default function Enterprise() {
         });
         const data = await resp.json();
         if (data.status === "ok" && Array.isArray(data.projects)) {
-          setProjects(data.projects.map((p: any) => ({ ...p, id: p.id || p._id })));
+          const loadedProjects = data.projects.map((p: any) => ({ ...p, id: p.id || p._id }));
+          setProjects(loadedProjects);
+          setActiveProject((prev) => {
+            if (prev) return prev;
+            const savedProjectId = window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
+            return loadedProjects.find((p: Project) => p.id === savedProjectId) || null;
+          });
         }
       } catch (e) {
         console.error("Failed to load projects:", e);
@@ -281,6 +311,97 @@ export default function Enterprise() {
     }
   };
 
+  const clearScanPolling = () => {
+    if (scanPollRef.current) {
+      clearInterval(scanPollRef.current);
+      scanPollRef.current = null;
+    }
+  };
+
+  const updateScanStateFromStatus = (data: any): boolean => {
+    const phase1Status = data?.phase1_status || "not_started";
+    const phase2Status = data?.phase2_status || "not_started";
+
+    if (data?.stats) {
+      setScanProgress({
+        files_processed: data.stats.files_processed || 0,
+        total_files: data.stats.total_files_to_process || 0,
+        symbols_indexed: data.stats.symbols_indexed || 0,
+      });
+    }
+
+    if (phase1Status === "complete" && phase2Status === "complete") {
+      setScanPhase("complete");
+      setIsScanning(false);
+      setScanError("");
+      return true;
+    }
+
+    if (phase1Status === "failed" || phase2Status === "failed") {
+      setScanPhase("failed");
+      setIsScanning(false);
+      setScanError(data?.error || "Scan failed. Please check the repository and try again.");
+      return true;
+    }
+
+    if (phase1Status === "complete") {
+      setScanPhase("phase2");
+      setIsScanning(true);
+      setScanError("");
+      return false;
+    }
+
+    if (phase1Status === "running" || phase1Status === "pending") {
+      setScanPhase("phase1");
+      setIsScanning(true);
+      setScanError("");
+      return false;
+    }
+
+    setScanPhase("idle");
+    setIsScanning(false);
+    return true;
+  };
+
+  const fetchScanStatusForProject = async (project: Project): Promise<boolean> => {
+    const resp = await fetch(
+      `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(project.org_id)}&repo=${encodeURIComponent(project.repo)}`,
+      { headers: authBearerHeaders(token) }
+    );
+    const data = await resp.json();
+    return updateScanStateFromStatus(data);
+  };
+
+  const startScanStatusPolling = (project: Project) => {
+    clearScanPolling();
+
+    const poll = async () => {
+      try {
+        const done = await fetchScanStatusForProject(project);
+        if (done) clearScanPolling();
+      } catch (e) {
+        console.error("Failed to poll scan status:", e);
+      }
+    };
+
+    scanPollRef.current = setInterval(poll, 3000);
+    poll();
+  };
+
+  // Hydrate persisted scanner/catalog state when the active project changes.
+  useEffect(() => {
+    if (!activeProject || !token || !username.trim()) {
+      clearScanPolling();
+      return;
+    }
+
+    setScanProgress({ files_processed: 0, total_files: 0, symbols_indexed: 0 });
+    setScanError("");
+    startScanStatusPolling(activeProject);
+
+    return clearScanPolling;
+  }, [activeProject?.id, activeProject?.org_id, activeProject?.repo, token, username]);
+
   // Create project
   const handleCreateProject = async () => {
     if (!newProjectName.trim() || !newProjectGithubUrl.trim()) return;
@@ -308,6 +429,7 @@ export default function Enterprise() {
         const newProject = { ...data.project, id: data.project.id || data.project._id };
         setProjects([...projects, newProject]);
         setActiveProject(newProject);
+        window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, newProject.id);
         setShowCreateProject(false);
         setNewProjectName("");
         setNewProjectGithubUrl("");
@@ -348,7 +470,18 @@ export default function Enterprise() {
 
       const data = await resp.json();
       if (data.status === "ok") {
-        pollScanStatusForProject(project);
+        updateScanStateFromStatus(data);
+        startScanStatusPolling(project);
+        if (data.reused && data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `scan-reused-${Date.now()}`,
+              role: "status",
+              content: data.message || "Repository is already scanned and ready.",
+            },
+          ]);
+        }
       } else {
         setScanError(data.error || "Failed to start scan");
         setIsScanning(false);
@@ -360,52 +493,6 @@ export default function Enterprise() {
       setIsScanning(false);
       setScanPhase("idle");
     }
-  };
-
-  // Poll scan status for a specific project
-  const pollScanStatusForProject = async (project: Project) => {
-    const interval = setInterval(async () => {
-      try {
-        const resp = await fetch(
-          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(project.org_id)}&repo=${encodeURIComponent(project.repo)}`,
-          { headers: authBearerHeaders(token) }
-        );
-
-        const data = await resp.json();
-        
-        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
-          setScanPhase("complete");
-          setIsScanning(false);
-          clearInterval(interval);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `scan-complete-${Date.now()}`,
-              role: "status",
-              content: "Repository scan complete! You can now chat and add annotations.",
-            },
-          ]);
-        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
-          setScanError("Scan failed. Please check the repository and try again.");
-          setScanPhase("failed");
-          setIsScanning(false);
-          clearInterval(interval);
-        } else {
-          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
-          if (data.stats) {
-            setScanProgress({
-              files_processed: data.stats.files_processed || 0,
-              total_files: data.stats.total_files_to_process || 0,
-              symbols_indexed: data.stats.symbols_indexed || 0,
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to poll scan status:", e);
-      }
-    }, 3000);
-
-    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
   // Lookup user by username
@@ -556,8 +643,18 @@ export default function Enterprise() {
 
       const data = await resp.json();
       if (data.status === "ok") {
-        // Start polling for scan status
-        pollScanStatus();
+        updateScanStateFromStatus(data);
+        startScanStatusPolling(activeProject);
+        if (data.reused && data.phase1_status === "complete" && data.phase2_status === "complete") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `scan-reused-${Date.now()}`,
+              role: "status",
+              content: data.message || "Repository is already scanned and ready.",
+            },
+          ]);
+        }
       } else {
         setScanError(data.error || "Failed to start scan");
         setIsScanning(false);
@@ -569,56 +666,6 @@ export default function Enterprise() {
       setIsScanning(false);
       setScanPhase("idle");
     }
-  };
-
-  // Poll scan status
-  const pollScanStatus = async () => {
-    if (!activeProject) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const resp = await fetch(
-          `${API_URL}/v1/scanner/catalog-status?username=${encodeURIComponent(username)}&org_id=${encodeURIComponent(activeProject.org_id)}&repo=${encodeURIComponent(activeProject.repo)}`,
-          { headers: authBearerHeaders(token) }
-        );
-
-        const data = await resp.json();
-        
-        if (data.phase1_status === "complete" && data.phase2_status === "complete") {
-          setScanPhase("complete");
-          setIsScanning(false);
-          clearInterval(interval);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `scan-complete-${Date.now()}`,
-              role: "status",
-              content: "Scan complete! Repository is now ready for chat and annotations.",
-            },
-          ]);
-        } else if (data.phase1_status === "failed" || data.phase2_status === "failed") {
-          setScanError("Scan failed. Please check the repository and try again.");
-          setScanPhase("idle");
-          setIsScanning(false);
-          clearInterval(interval);
-        } else {
-          // Update progress
-          setScanPhase(data.phase1_status === "complete" ? "phase2" : "phase1");
-          if (data.stats) {
-            setScanProgress({
-              files_processed: data.stats.files_processed || 0,
-              total_files: data.stats.total_files_to_process || 0,
-              symbols_indexed: data.stats.symbols_indexed || 0,
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to poll scan status:", e);
-      }
-    }, 3000);
-
-    // Clear interval after 10 minutes (max scan time)
-    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
   };
 
   // Create annotation
@@ -644,6 +691,7 @@ export default function Enterprise() {
         setNewAnnotationContent("");
         setNewAnnotationTarget("");
         setShowAnnotationPanel(false);
+        updateProjectAnnotationCount(activeProject.id, 1);
         // Refresh annotations
         loadAnnotationsForProject(activeProject.id);
       }
@@ -678,6 +726,7 @@ export default function Enterprise() {
   const handleSendMessage = async () => {
     if (!chatInput.trim() || !activeProject || chatLoading || scanPhase !== "complete") return;
 
+    const projectId = activeProject.id;
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -696,7 +745,7 @@ export default function Enterprise() {
 
     try {
       const resp = await fetch(
-        `${API_URL}/v1/enterprise/projects/${activeProject.id}/chat`,
+        `${API_URL}/v1/enterprise/projects/${projectId}/chat`,
         {
           method: "POST",
           headers: authJsonHeaders(token),
@@ -707,9 +756,25 @@ export default function Enterprise() {
         }
       );
 
-      if (!resp.ok || !resp.body) {
-        throw new Error("Failed to get response");
+      if (!resp.ok) {
+        let msg = "Failed to get response";
+        try {
+          const errBody = await resp.json();
+          if (typeof errBody?.error === "string") {
+            msg = errBody.error;
+          } else if (typeof errBody?.detail === "string") {
+            msg = errBody.detail;
+          }
+        } catch {
+          /* use default */
+        }
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: msg } : m))
+        );
+        return;
       }
+
+      if (!resp.body) throw new Error("No response body");
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -728,7 +793,33 @@ export default function Enterprise() {
           try {
             const chunk = JSON.parse(line);
 
-            if (chunk.type === "annotations") {
+            if (chunk.type === "status") {
+              const content = chunk.content || chunk.status || "Working...";
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `status-${Date.now()}`,
+                  role: "status",
+                  content,
+                },
+              ]);
+            } else if (chunk.type === "tool_calls") {
+              const tools = chunk.tools || chunk.tool_calls || chunk.toolCalls || [];
+              if (Array.isArray(tools) && tools.length > 0) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, toolCalls: [...(m.toolCalls || []), ...tools] }
+                      : m
+                  )
+                );
+              }
+            } else if (chunk.type === "error") {
+              const content = chunk.error || chunk.message || "Failed to get response. Please try again.";
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content } : m))
+              );
+            } else if (chunk.type === "annotations") {
               setMessages((prev) => [
                 ...prev,
                 {
@@ -738,19 +829,28 @@ export default function Enterprise() {
                   annotations: chunk.annotations,
                 },
               ]);
+            } else if (chunk.type === "annotations_created") {
+              const count = Number(chunk.count ?? (Array.isArray(chunk.ids) ? chunk.ids.length : 0));
+              if (count > 0) {
+                updateProjectAnnotationCount(projectId, count);
+                loadAnnotationsForProject(projectId);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: `annotations-created-${Date.now()}`,
+                    role: "status",
+                    content: `Saved ${count} team annotation${count === 1 ? "" : "s"} from this chat.`,
+                  },
+                ]);
+              }
             } else if (chunk.type === "chunk") {
               const textToAdd = chunk.text || "";
               if (textToAdd) {
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  if (last.id === assistantId) {
-                    return [
-                      ...prev.slice(0, -1),
-                      { ...last, content: last.content + textToAdd },
-                    ];
-                  }
-                  return prev;
-                });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, content: m.content + textToAdd } : m
+                  )
+                );
               }
             }
           } catch {
@@ -759,16 +859,13 @@ export default function Enterprise() {
         }
       }
     } catch (e) {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last.id === assistantId) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: "Failed to get response. Please try again." },
-          ];
-        }
-        return prev;
-      });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: "Failed to get response. Please try again." }
+            : m
+        )
+      );
     } finally {
       setChatLoading(false);
     }
@@ -889,6 +986,7 @@ export default function Enterprise() {
                   key={project.id}
                   onClick={() => {
                     setActiveProject(project);
+                    window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, project.id);
                     setActiveTab("chat");
                     setMessages([]);
                     loadAnnotationsForProject(project.id);
@@ -975,7 +1073,10 @@ export default function Enterprise() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setActiveProject(null)}
+                  onClick={() => {
+                    setActiveProject(null);
+                    window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+                  }}
                   className="text-xs text-white/30 hover:text-white/60 transition-colors"
                 >
                   Close
@@ -988,19 +1089,8 @@ export default function Enterprise() {
                 {activeTab === "chat" && (
                   <div className="flex flex-col h-full">
                     {/* Chat Header Info */}
-                    <div className="px-4 py-2 border-b border-white/5 bg-black/20 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs text-white/40">Ask about the codebase and see team annotations in context</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-white/40 uppercase tracking-widest">Debug</span>
-                        <button
-                          onClick={() => setDebugMode(!debugMode)}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${debugMode ? "bg-blue-500/80" : "bg-white/10"}`}
-                        >
-                          <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${debugMode ? "translate-x-4" : "translate-x-0"}`} />
-                        </button>
-                      </div>
+                    <div className="px-4 py-2 border-b border-white/5 bg-black/20">
+                      <span className="text-xs text-white/40">Ask about the codebase and see team annotations in context</span>
                     </div>
 
                     {/* Scan Status Banner */}
@@ -1152,19 +1242,6 @@ export default function Enterprise() {
                           {msg.content ? renderMarkdown(msg.content) : (chatLoading && !isUser && <Loader2 className="w-4 h-4 animate-spin text-white/30" />)}
                         </div>
 
-                        {debugMode && msg.toolCalls && msg.toolCalls.length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2">
-                            <span className="text-[10px] text-white/30 uppercase tracking-widest">Tool Invocations ({msg.toolCalls.length})</span>
-                            {msg.toolCalls.map((tc, idx) => (
-                              <div key={idx} className="bg-black/40 rounded p-3 font-mono text-[11px] text-white/60 border border-white/5">
-                                <span className="text-purple-400">{tc.name}</span>
-                                <span className="text-white/30">(</span>
-                                <span className="text-blue-300/80">{JSON.stringify(tc.args)}</span>
-                                <span className="text-white/30">)</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );

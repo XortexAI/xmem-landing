@@ -9,7 +9,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      className="relative min-h-[92svh] flex items-center justify-center overflow-hidden pt-28 pb-16"
       style={{ background: "transparent" }}
     >
       <div className="absolute inset-0 grid-pattern opacity-50 z-0" />
@@ -46,8 +46,8 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="text-6xl md:text-8xl font-bold text-white mb-6 leading-none tracking-tighter"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          className="text-6xl md:text-8xl font-bold text-white mb-6 leading-none"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: 0 }}
         >
           Memory for the
           <br />
@@ -123,7 +123,7 @@ export function HeroSection() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+        className="absolute bottom-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
         style={{ zIndex: 10 }}
       >
         <div className="text-xs text-white/30 uppercase tracking-widest">
