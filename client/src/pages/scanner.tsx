@@ -13,6 +13,9 @@ import {
   Star,
   Copy,
   Menu,
+  AlertTriangle,
+  Pause,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -40,6 +43,7 @@ interface RepoEntry {
   share_index_publicly?: boolean;
   stats?: any;
   phase2_stats?: any;
+  error?: string;
 }
 
 interface ScanEstimates {
@@ -73,7 +77,9 @@ function StatusDot({ status }: { status: string }) {
   if (status === "running")
     return <Loader2 className="w-3 h-3 text-white/60 animate-spin" />;
   if (status === "failed")
-    return <X className="w-3 h-3 text-white/40" />;
+    return <X className="w-3 h-3 text-red-400/80" />;
+  if (status === "paused")
+    return <Pause className="w-3 h-3 text-yellow-400/80" />;
   return <Circle className="w-2 h-2 text-white/20" />;
 }
 
@@ -147,12 +153,16 @@ export default function Scanner() {
 
   const [githubUrl, setGithubUrl] = useState("");
   const [branch, setBranch] = useState("main");
+  const [availableBranches, setAvailableBranches] = useState<string[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [pat, setPat] = useState("");
   const [showPat, setShowPat] = useState(false);
   const [validating, setValidating] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [inputError, setInputError] = useState("");
+  const [scanError, setScanError] = useState("");
   const [estimates, setEstimates] = useState<ScanEstimates | null>(null);
+  const [pausing, setPausing] = useState(false);
 
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
@@ -189,6 +199,11 @@ export default function Scanner() {
     }
     return fromList;
   }, [repos, activeRepo]);
+
+  const visibleRepos = useMemo(
+    () => repos.filter((r) => r.phase1_status !== "failed"),
+    [repos],
+  );
 
   // ── Load persisted repos from API ─────────────────────────────────
 
@@ -283,6 +298,7 @@ export default function Scanner() {
                     phase2_status: data.phase2_status,
                     stats: data.stats,
                     phase2_stats: data.phase2_stats,
+                    error: data.error || undefined,
                     share_index_publicly:
                       data.share_index_publicly !== undefined
                         ? data.share_index_publicly
@@ -300,6 +316,7 @@ export default function Scanner() {
                 phase2_status: data.phase2_status,
                 stats: data.stats,
                 phase2_stats: data.phase2_stats,
+                error: data.error || undefined,
                 share_index_publicly:
                   data.share_index_publicly !== undefined
                     ? data.share_index_publicly
@@ -318,6 +335,30 @@ export default function Scanner() {
                     content: `Phase 1 complete. ${repo.org}/${repo.repo} is now searchable. Ask anything about the codebase.`,
                   },
                 ]);
+              }
+
+              if (
+                data.phase1_status === "failed" &&
+                prev.phase1_status === "running"
+              ) {
+                const errMsg = data.error || "Scan failed unexpectedly.";
+                setScanError(errMsg);
+                setMessages((msgs) => [
+                  ...msgs,
+                  {
+                    id: `status-fail-${Date.now()}`,
+                    role: "status",
+                    content: `Scan failed: ${errMsg}`,
+                  },
+                ]);
+              }
+
+              if (
+                data.phase2_status === "failed" &&
+                prev.phase2_status === "running"
+              ) {
+                const errMsg = data.error || "Phase 2 enrichment failed.";
+                setScanError(errMsg);
               }
 
               // Clear estimates when both phases are done
@@ -354,6 +395,66 @@ export default function Scanner() {
     setMessages([]);
     setScannerTab("mine");
     setCommunityItems([]);
+  };
+
+  const fetchBranches = async (url: string) => {
+    if (!url.trim() || !token) return;
+    setBranchesLoading(true);
+    setAvailableBranches([]);
+    try {
+      const params = new URLSearchParams({
+        github_url: url.trim(),
+        pat: pat.trim(),
+      });
+      const resp = await fetch(
+        `${API_URL}/v1/scanner/branches?${params}`,
+        { headers: authBearerHeaders(token) },
+      );
+      const data = await resp.json();
+      if (data.status === "ok" && Array.isArray(data.branches)) {
+        setAvailableBranches(data.branches);
+        if (data.default_branch) setBranch(data.default_branch);
+      }
+    } catch {
+      // Fall back to manual text input (availableBranches stays empty)
+    } finally {
+      setBranchesLoading(false);
+    }
+  };
+
+  const handlePauseScan = async () => {
+    if (!activeRepo || !username) return;
+    setPausing(true);
+    try {
+      const resp = await fetch(`${API_URL}/v1/scanner/pause`, {
+        method: "POST",
+        headers: authJsonHeaders(token),
+        body: JSON.stringify({
+          username,
+          org_id: activeRepo.org,
+          repo: activeRepo.repo,
+        }),
+      });
+      const data = await resp.json();
+      if (data.status === "ok") {
+        const update = (r: RepoEntry) =>
+          r.org === activeRepo.org && r.repo === activeRepo.repo
+            ? { ...r, phase1_status: data.phase1_status || "paused", phase2_status: data.phase2_status || r.phase2_status }
+            : r;
+        setRepos((prev) => prev.map(update));
+        setActiveRepo((prev) => prev ? update(prev) : prev);
+        setMessages((msgs) => [
+          ...msgs,
+          { id: `paused-${Date.now()}`, role: "status", content: "Indexing paused." },
+        ]);
+      } else {
+        setScanError(data.error || "Failed to pause scan.");
+      }
+    } catch {
+      setScanError("Network error while pausing scan.");
+    } finally {
+      setPausing(false);
+    }
   };
 
   const renderMarkdown = (text: string) => {
@@ -848,6 +949,7 @@ export default function Scanner() {
   const selectRepo = (repo: RepoEntry) => {
     setActiveRepo(repo);
     setMessages([]);
+    setScanError("");
 
     if (repo.phase1_status === "complete") {
       setMessages([
@@ -1003,6 +1105,11 @@ export default function Scanner() {
                 setInputError("");
                 setShowPat(false);
                 setEstimates(null);
+                setAvailableBranches([]);
+                setBranch("main");
+              }}
+              onBlur={() => {
+                if (githubUrl.trim()) fetchBranches(githubUrl);
               }}
               placeholder="https://github.com/org/repo"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors font-mono"
@@ -1025,13 +1132,35 @@ export default function Scanner() {
             )}
 
             <div className="flex items-center gap-2 mt-3">
-              <input
-                type="text"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                placeholder="main"
-                className="flex-1 bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-white text-xs placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
-              />
+              {branchesLoading ? (
+                <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5">
+                  <Loader2 className="w-3 h-3 text-white/40 animate-spin" />
+                  <span className="text-xs text-white/30">Loading branches...</span>
+                </div>
+              ) : availableBranches.length > 0 ? (
+                <div className="flex-1 relative">
+                  <select
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="w-full appearance-none bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-white/25 transition-colors pr-7 cursor-pointer"
+                  >
+                    {availableBranches.map((b) => (
+                      <option key={b} value={b} className="bg-[#111] text-white">
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-white/30 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  placeholder="main"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-white text-xs placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
+                />
+              )}
               <button
                 type="submit"
                 disabled={!githubUrl.trim() || scanning || validating}
@@ -1055,7 +1184,10 @@ export default function Scanner() {
             </div>
 
             {inputError && (
-              <p className="mt-2 text-xs text-white/50">{inputError}</p>
+              <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-300/90 leading-relaxed">{inputError}</p>
+              </div>
             )}
 
 
@@ -1067,13 +1199,13 @@ export default function Scanner() {
               Repositories
             </div>
 
-            {repos.length === 0 ? (
+            {visibleRepos.length === 0 ? (
               <p className="text-xs text-white/20">
                 No repositories scanned yet
               </p>
             ) : (
               <div className="space-y-1">
-                {repos.map((r) => {
+                {visibleRepos.map((r) => {
                   const isActive =
                     activeRepo?.org === r.org &&
                     activeRepo?.repo === r.repo;
@@ -1236,6 +1368,22 @@ export default function Scanner() {
 
         {/* ── Right Panel — Chat ──────────────────────────────────── */}
         <main className="flex-1 flex flex-col min-w-0">
+          {/* Scan error banner */}
+          {scanError && (
+            <div className="px-5 py-3 bg-red-500/10 border-b border-red-500/20 flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <p className="text-sm text-red-300/90 truncate">{scanError}</p>
+              </div>
+              <button
+                onClick={() => setScanError("")}
+                className="text-red-400/60 hover:text-red-300 transition-colors shrink-0 ml-3"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {!activeRepo ? (
             <div className="flex-1 flex flex-col items-center p-8 bg-[#0A0A0A] overflow-y-auto custom-scrollbar">
               <div className="w-full max-w-3xl mt-12 mb-8">
@@ -1296,6 +1444,16 @@ export default function Scanner() {
                    ? "Parsing ASTs, generating code embeddings, and extracting symbol definitions." 
                    : "Generating AI-powered summaries for all codebase files and symbols."}
                </p>
+
+               {/* Pause button */}
+               <button
+                 onClick={handlePauseScan}
+                 disabled={pausing}
+                 className="mb-6 flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
+               >
+                 {pausing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
+                 Pause Indexing
+               </button>
 
                {/* Scan Estimates Panel */}
                {estimates && (
@@ -1410,6 +1568,29 @@ export default function Scanner() {
                  </div>
                )}
              </div>
+          ) : activeRepo.phase1_status === "failed" ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
+              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
+                <AlertTriangle className="w-8 h-8 text-red-400" />
+              </div>
+              <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                Scan Failed
+              </h2>
+              <p className="text-sm text-white/40 mb-2 max-w-md text-center leading-relaxed">
+                {activeRepo.org}/{activeRepo.repo}
+              </p>
+              {activeRepo.error && (
+                <div className="max-w-md w-full mt-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                  <p className="text-sm text-red-300/90 leading-relaxed break-words">{activeRepo.error}</p>
+                </div>
+              )}
+              <button
+                onClick={() => { setActiveRepo(null); setScanError(""); }}
+                className="mt-6 px-5 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              >
+                Back to repositories
+              </button>
+            </div>
           ) : (
             <>
               {/* Chat Header */}
