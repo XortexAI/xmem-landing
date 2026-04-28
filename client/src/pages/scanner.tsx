@@ -1059,7 +1059,8 @@ export default function Scanner() {
 
   const canChat = activeRepo?.phase1_status === "complete" && 
                   activeRepo?.phase2_status !== "running" && 
-                  activeRepo?.phase2_status !== "pending";
+                  activeRepo?.phase2_status !== "pending" &&
+                  activeRepo?.phase2_status !== "paused";
 
   return (
     <div
