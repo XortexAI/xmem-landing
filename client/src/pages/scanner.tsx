@@ -152,7 +152,7 @@ export default function Scanner() {
   const username = user?.username ?? user?.name ?? "";
 
   const [githubUrl, setGithubUrl] = useState("");
-  const [branch, setBranch] = useState("main");
+  const [branch, setBranch] = useState("");
   const [availableBranches, setAvailableBranches] = useState<string[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [pat, setPat] = useState("");
@@ -343,6 +343,7 @@ export default function Scanner() {
               ) {
                 const errMsg = data.error || "Scan failed unexpectedly.";
                 setScanError(errMsg);
+                setEstimates(null);
                 setMessages((msgs) => [
                   ...msgs,
                   {
@@ -504,10 +505,12 @@ export default function Scanner() {
 
   // ── Scan ─────────────────────────────────────────────────────────────
 
-  const triggerScan = async () => {
+  const triggerScan = async (overrideBranch?: string) => {
     if (!githubUrl.trim()) return;
     setInputError("");
     setScanning(true);
+
+    const effectiveBranch = (overrideBranch ?? branch).trim() || "main";
 
     try {
       const resp = await fetch(`${API_URL}/v1/scanner/scan`, {
@@ -517,7 +520,7 @@ export default function Scanner() {
           github_url: githubUrl.trim(),
           username,
           pat: pat.trim(),
-          branch: branch.trim() || "main",
+          branch: effectiveBranch,
         }),
       });
 
@@ -631,11 +634,12 @@ export default function Scanner() {
       }
 
       if (data.accessible) {
+        const effectiveBranch = data.default_branch || branch;
         if (data.default_branch) setBranch(data.default_branch);
         if (data.estimates) setEstimates(data.estimates as ScanEstimates);
         // Yield so the estimate panel can paint before the long-running scan starts.
         await new Promise((r) => setTimeout(r, 80));
-        await triggerScan();
+        await triggerScan(effectiveBranch);
         return;
       }
 
@@ -1106,7 +1110,7 @@ export default function Scanner() {
                 setShowPat(false);
                 setEstimates(null);
                 setAvailableBranches([]);
-                setBranch("main");
+                setBranch("");
               }}
               onBlur={() => {
                 if (githubUrl.trim()) fetchBranches(githubUrl);
@@ -1405,7 +1409,7 @@ export default function Scanner() {
                 </div>
 
                 <div className="grid gap-3">
-                  {repos.filter(r => r.repo.toLowerCase().includes(repoSearch.toLowerCase()) || r.org.toLowerCase().includes(repoSearch.toLowerCase())).map((repo) => (
+                  {visibleRepos.filter(r => r.repo.toLowerCase().includes(repoSearch.toLowerCase()) || r.org.toLowerCase().includes(repoSearch.toLowerCase())).map((repo) => (
                     <div
                       key={`${repo.org}/${repo.repo}`}
                       onClick={() => { setActiveRepo(repo); setMessages([]); }}
@@ -1428,7 +1432,7 @@ export default function Scanner() {
                 </div>
               </div>
             </div>
-          ) : !canChat && (
+          ) : !canChat && !scanError && (
               activeRepo.phase1_status === "running" || 
               activeRepo.phase1_status === "pending" || 
               activeRepo.phase2_status === "running" || 
@@ -1568,7 +1572,7 @@ export default function Scanner() {
                  </div>
                )}
              </div>
-          ) : activeRepo.phase1_status === "failed" ? (
+          ) : activeRepo.phase1_status === "failed" || scanError ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
               <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
                 <AlertTriangle className="w-8 h-8 text-red-400" />
@@ -1579,13 +1583,13 @@ export default function Scanner() {
               <p className="text-sm text-white/40 mb-2 max-w-md text-center leading-relaxed">
                 {activeRepo.org}/{activeRepo.repo}
               </p>
-              {activeRepo.error && (
+              {(activeRepo.error || scanError) && (
                 <div className="max-w-md w-full mt-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                  <p className="text-sm text-red-300/90 leading-relaxed break-words">{activeRepo.error}</p>
+                  <p className="text-sm text-red-300/90 leading-relaxed break-words">{activeRepo.error || scanError}</p>
                 </div>
               )}
               <button
-                onClick={() => { setActiveRepo(null); setScanError(""); }}
+                onClick={() => { setActiveRepo(null); setScanError(""); setEstimates(null); }}
                 className="mt-6 px-5 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all"
               >
                 Back to repositories
