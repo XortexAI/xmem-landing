@@ -15,6 +15,7 @@ import {
   Menu,
   AlertTriangle,
   Pause,
+  Play,
   ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,6 +63,7 @@ interface ChatMessage {
   role: "user" | "assistant" | "status";
   content: string;
   toolCalls?: any[];
+  isError?: boolean;
 }
 
 interface CommunityItem {
@@ -163,6 +165,7 @@ export default function Scanner() {
   const [scanError, setScanError] = useState("");
   const [estimates, setEstimates] = useState<ScanEstimates | null>(null);
   const [pausing, setPausing] = useState(false);
+  const [resuming, setResuming] = useState(false);
 
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
@@ -455,6 +458,42 @@ export default function Scanner() {
       setScanError("Network error while pausing scan.");
     } finally {
       setPausing(false);
+    }
+  };
+
+  const handleResumeScan = async () => {
+    if (!activeRepo || !username) return;
+    setResuming(true);
+    setScanError("");
+    try {
+      const resp = await fetch(`${API_URL}/v1/scanner/resume`, {
+        method: "POST",
+        headers: authJsonHeaders(token),
+        body: JSON.stringify({
+          username,
+          org_id: activeRepo.org,
+          repo: activeRepo.repo,
+        }),
+      });
+      const data = await resp.json();
+      if (data.status === "ok") {
+        const update = (r: RepoEntry) =>
+          r.org === activeRepo.org && r.repo === activeRepo.repo
+            ? { ...r, phase1_status: data.phase1_status || r.phase1_status, phase2_status: data.phase2_status || r.phase2_status, error: undefined }
+            : r;
+        setRepos((prev) => prev.map(update));
+        setActiveRepo((prev) => prev ? update(prev) : prev);
+        setMessages((msgs) => [
+          ...msgs,
+          { id: `resumed-${Date.now()}`, role: "status", content: "Indexing resumed." },
+        ]);
+      } else {
+        setScanError(data.error || "Failed to resume scan.");
+      }
+    } catch {
+      setScanError("Network error while resuming scan.");
+    } finally {
+      setResuming(false);
     }
   };
 
@@ -903,6 +942,21 @@ export default function Scanner() {
                   content: chunk.content,
                 },
               ]);
+            } else if (chunk.type === "error") {
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                if (last.id === assistantId) {
+                  return [
+                    ...prev.slice(0, -1),
+                    {
+                      ...last,
+                      content: "Server is busy, please try again later.",
+                      isError: true,
+                    },
+                  ];
+                }
+                return prev;
+              });
             } else if (chunk.type === "tool_calls") {
               setMessages((prev) =>
                 prev.map((m) =>
@@ -1433,6 +1487,41 @@ export default function Scanner() {
               </div>
             </div>
           ) : !canChat && !scanError && (
+              activeRepo.phase1_status === "paused" ||
+              activeRepo.phase2_status === "paused"
+          ) ? (
+             <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
+               <div className="w-16 h-16 rounded-full bg-yellow-500/10 flex items-center justify-center mb-6">
+                 <Pause className="w-8 h-8 text-yellow-400" />
+               </div>
+               <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                 Indexing Paused
+               </h2>
+               <p className="text-sm text-white/40 mb-2 max-w-md text-center leading-relaxed">
+                 {activeRepo.org}/{activeRepo.repo}
+               </p>
+               <p className="text-xs text-white/30 mb-6 max-w-md text-center">
+                 {activeRepo.phase1_status === "paused"
+                   ? "Phase 1 (AST indexing) was paused. Resume to continue from where it stopped."
+                   : "Phase 2 (LLM enrichment) was paused. Resume to continue from where it stopped."}
+               </p>
+
+               <button
+                 onClick={handleResumeScan}
+                 disabled={resuming}
+                 className="mb-4 flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-medium border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-all disabled:opacity-40"
+               >
+                 {resuming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                 Continue Indexing
+               </button>
+               <button
+                 onClick={() => { setActiveRepo(null); setScanError(""); }}
+                 className="px-4 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/40 hover:text-white/60 hover:bg-white/10 transition-all"
+               >
+                 Back to repositories
+               </button>
+             </div>
+          ) : !canChat && !scanError && (
               activeRepo.phase1_status === "running" || 
               activeRepo.phase1_status === "pending" || 
               activeRepo.phase2_status === "running" || 
@@ -1695,6 +1784,8 @@ export default function Scanner() {
                     );
                   }
 
+                  const isError = msg.isError;
+
                   return (
                     <div
                       key={msg.id}
@@ -1706,7 +1797,9 @@ export default function Scanner() {
                         className={`max-w-[85%] rounded-2xl p-4 ${
                           isUser
                             ? "bg-gradient-to-br from-blue-600/20 to-blue-500/10 text-white/90 border border-blue-500/20"
-                            : "bg-white/5 text-white/80 border border-white/10"
+                            : isError
+                              ? "bg-red-500/10 text-red-200 border border-red-500/30"
+                              : "bg-white/5 text-white/80 border border-white/10"
                         }`}
                       >
                         <div className="text-sm font-light leading-relaxed">
