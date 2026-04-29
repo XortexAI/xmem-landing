@@ -293,7 +293,7 @@ export default function Dashboard() {
             </Alert>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 lg:grid-cols-3 mb-8">
             {/* Profile Card */}
             <Card className="bg-[#111] border-gray-800 lg:col-span-1">
               <CardHeader>
@@ -461,7 +461,8 @@ export default function Dashboard() {
           </div>
 
           {/* Your Memories Panel */}
-          <Card className="mt-8 bg-[#111] border-gray-800 overflow-hidden">
+          <div className="mt-8 pt-4">
+            <Card className="bg-[#111] border-gray-800 overflow-hidden" style={{ marginTop: "2rem" }}>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg text-white flex items-center gap-2">
@@ -585,6 +586,7 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
 
