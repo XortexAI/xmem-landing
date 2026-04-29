@@ -14,8 +14,6 @@ import {
   Copy,
   Menu,
   AlertTriangle,
-  Pause,
-  Play,
   ChevronDown,
   RefreshCw,
 } from "lucide-react";
@@ -83,7 +81,7 @@ function StatusDot({ status }: { status: string }) {
   if (status === "failed")
     return <X className="w-3 h-3 text-red-400/80" />;
   if (status === "paused")
-    return <Pause className="w-3 h-3 text-yellow-400/80" />;
+    return <Circle className="w-2 h-2 text-yellow-400/80" />;
   return <Circle className="w-2 h-2 text-white/20" />;
 }
 
@@ -166,8 +164,7 @@ export default function Scanner() {
   const [inputError, setInputError] = useState("");
   const [scanError, setScanError] = useState("");
   const [estimates, setEstimates] = useState<ScanEstimates | null>(null);
-  const [pausing, setPausing] = useState(false);
-  const [resuming, setResuming] = useState(false);
+
   const [syncing, setSyncing] = useState(false);
   const [showSyncPat, setShowSyncPat] = useState(false);
   const [syncPat, setSyncPat] = useState("");
@@ -432,76 +429,7 @@ export default function Scanner() {
     }
   };
 
-  const handlePauseScan = async () => {
-    if (!activeRepo || !username) return;
-    setPausing(true);
-    try {
-      const resp = await fetch(`${API_URL}/v1/scanner/pause`, {
-        method: "POST",
-        headers: authJsonHeaders(token),
-        body: JSON.stringify({
-          username,
-          org_id: activeRepo.org,
-          repo: activeRepo.repo,
-        }),
-      });
-      const data = await resp.json();
-      if (data.status === "ok") {
-        const update = (r: RepoEntry) =>
-          r.org === activeRepo.org && r.repo === activeRepo.repo
-            ? { ...r, phase1_status: data.phase1_status || "paused", phase2_status: data.phase2_status || r.phase2_status }
-            : r;
-        setRepos((prev) => prev.map(update));
-        setActiveRepo((prev) => prev ? update(prev) : prev);
-        setMessages((msgs) => [
-          ...msgs,
-          { id: `paused-${Date.now()}`, role: "status", content: "Indexing paused." },
-        ]);
-      } else {
-        setScanError(data.error || "Failed to pause scan.");
-      }
-    } catch {
-      setScanError("Network error while pausing scan.");
-    } finally {
-      setPausing(false);
-    }
-  };
 
-  const handleResumeScan = async () => {
-    if (!activeRepo || !username) return;
-    setResuming(true);
-    setScanError("");
-    try {
-      const resp = await fetch(`${API_URL}/v1/scanner/resume`, {
-        method: "POST",
-        headers: authJsonHeaders(token),
-        body: JSON.stringify({
-          username,
-          org_id: activeRepo.org,
-          repo: activeRepo.repo,
-        }),
-      });
-      const data = await resp.json();
-      if (data.status === "ok") {
-        const update = (r: RepoEntry) =>
-          r.org === activeRepo.org && r.repo === activeRepo.repo
-            ? { ...r, phase1_status: data.phase1_status || r.phase1_status, phase2_status: data.phase2_status || r.phase2_status, error: undefined }
-            : r;
-        setRepos((prev) => prev.map(update));
-        setActiveRepo((prev) => prev ? update(prev) : prev);
-        setMessages((msgs) => [
-          ...msgs,
-          { id: `resumed-${Date.now()}`, role: "status", content: "Indexing resumed." },
-        ]);
-      } else {
-        setScanError(data.error || "Failed to resume scan.");
-      }
-    } catch {
-      setScanError("Network error while resuming scan.");
-    } finally {
-      setResuming(false);
-    }
-  };
 
   const renderMarkdown = (text: string) => {
     return text.split('```').map((part, index) => {
@@ -1181,8 +1109,7 @@ export default function Scanner() {
 
   const canChat = activeRepo?.phase1_status === "complete" && 
                   activeRepo?.phase2_status !== "running" && 
-                  activeRepo?.phase2_status !== "pending" &&
-                  activeRepo?.phase2_status !== "paused";
+                  activeRepo?.phase2_status !== "pending";
 
   return (
     <div
@@ -1593,62 +1520,13 @@ export default function Scanner() {
                       className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 rounded-xl cursor-pointer transition-all duration-300"
                     >
                       <div>
-                        <div className="text-white/90 font-medium flex items-center gap-2">
-                          <span className="text-white/30 font-normal">{repo.org}</span>
-                          <span className="text-white/30">/</span>
-                          <span className="">{repo.repo}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-4 sm:mt-0">
-                         <span className={`text-[10px] px-3 py-1 uppercase tracking-wider rounded-full ${repo.phase1_status === 'complete' ? 'bg-[#ff3366]/10 text-[#ff3366]' : 'bg-yellow-500/10 text-yellow-500'}`}>P1: {repo.phase1_status}</span>
-                         <span className={`text-[10px] px-3 py-1 uppercase tracking-wider rounded-full ${repo.phase2_status === 'complete' ? 'bg-[#00f0ff]/10 text-[#00f0ff]' : 'bg-yellow-500/10 text-yellow-500'}`}>P2: {repo.phase2_status}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {repos.length === 0 && <div className="text-white/20 text-sm py-12 text-center rounded-xl bg-white/[0.01] border border-white/5 border-dashed">No repositories found. Paste a link on the left to scan one.</div>}
-                </div>
-              </div>
-            </div>
-          ) : !canChat && !scanError && (
-              activeRepo.phase1_status === "paused" ||
-              activeRepo.phase2_status === "paused"
-          ) ? (
-             <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
-               <div className="w-16 h-16 rounded-full bg-yellow-500/10 flex items-center justify-center mb-6">
-                 <Pause className="w-8 h-8 text-yellow-400" />
-               </div>
-               <h2 className="text-2xl font-medium text-white/90 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                 Indexing Paused
-               </h2>
-               <p className="text-sm text-white/40 mb-2 max-w-md text-center leading-relaxed">
-                 {activeRepo.org}/{activeRepo.repo}
-               </p>
-               <p className="text-xs text-white/30 mb-6 max-w-md text-center">
-                 {activeRepo.phase1_status === "paused"
-                   ? "Phase 1 (AST indexing) was paused. Resume to continue from where it stopped."
-                   : "Phase 2 (LLM enrichment) was paused. Resume to continue from where it stopped."}
-               </p>
-
-               <button
-                 onClick={handleResumeScan}
-                 disabled={resuming}
-                 className="mb-4 flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-medium border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-all disabled:opacity-40"
-               >
-                 {resuming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                 Continue Indexing
-               </button>
-               <button
-                 onClick={() => { setActiveRepo(null); setScanError(""); }}
-                 className="px-4 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/40 hover:text-white/60 hover:bg-white/10 transition-all"
-               >
-                 Back to repositories
-               </button>
-             </div>
-          ) : !canChat && !scanError && (
+                                  ) : !canChat && !scanError && (
               activeRepo.phase1_status === "running" || 
               activeRepo.phase1_status === "pending" || 
+              activeRepo.phase1_status === "paused" ||
               activeRepo.phase2_status === "running" || 
-              activeRepo.phase2_status === "pending"
+              activeRepo.phase2_status === "pending" ||
+              activeRepo.phase2_status === "paused"
           ) ? (
              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20">
                <Loader2 className="w-8 h-8 text-white/40 animate-spin mb-6" />
@@ -1660,16 +1538,6 @@ export default function Scanner() {
                    ? "Parsing ASTs, generating code embeddings, and extracting symbol definitions." 
                    : "Generating AI-powered summaries for all codebase files and symbols."}
                </p>
-
-               {/* Pause button */}
-               <button
-                 onClick={handlePauseScan}
-                 disabled={pausing}
-                 className="mb-6 flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
-               >
-                 {pausing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
-                 Pause Indexing
-               </button>
 
                {/* Scan Estimates Panel */}
                {estimates && (
@@ -1834,7 +1702,7 @@ export default function Scanner() {
                       <button
                         type="button"
                         onClick={handleSync}
-                        disabled={syncing || resuming || pausing}
+                        disabled={syncing}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[10px] text-white/60 uppercase tracking-widest font-medium hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
                       >
                         <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin text-white/80' : ''}`} />
