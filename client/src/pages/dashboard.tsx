@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense, lazy } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -35,10 +36,17 @@ import {
   Edit2,
   Eye,
   EyeOff,
+  Brain,
+  RefreshCw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Navbar } from '@/sections/Navbar';
 import { Footer } from '@/sections/Footer';
+import { useMemoryGraph, type MemoryNode } from '@/hooks/useMemoryGraph';
+import { MemoryDetails } from '@/components/MemoryDetails';
+
+// Lazy load the 3D component for better performance
+const MemoryBrain = lazy(() => import('@/components/three-d/MemoryBrain').then(mod => ({ default: mod.MemoryBrain })));
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 
@@ -82,6 +90,10 @@ export default function Dashboard() {
 
   // Show key state
   const [showKeyId, setShowKeyId] = useState<string | null>(null);
+
+  // Memory graph state
+  const { data: memoryData, isLoading: isLoadingMemories, error: memoryError, refetch: refetchMemories } = useMemoryGraph(token);
+  const [selectedMemory, setSelectedMemory] = useState<MemoryNode | null>(null);
 
   const fetchApiKeys = useCallback(async () => {
     if (!token) return;
@@ -447,6 +459,132 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Your Memories Panel */}
+          <Card className="bg-[#111] border-gray-800 overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg text-white flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Your Memories
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Visualize your stored memories as an interconnected brain network
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {memoryData && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-gray-800 text-gray-300 border-gray-700"
+                  >
+                    {memoryData.total_memories} memories
+                  </Badge>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    refetchMemories();
+                    setSelectedMemory(null);
+                  }}
+                  disabled={isLoadingMemories}
+                  className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingMemories ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingMemories ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : memoryError ? (
+                <div className="text-center py-12 border-2 border-dashed border-gray-800 rounded-lg">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                  <h3 className="text-lg font-medium text-white mb-2">Failed to Load Memories</h3>
+                  <p className="text-gray-400 mb-4">{memoryError}</p>
+                  <Button
+                    onClick={() => refetchMemories()}
+                    variant="outline"
+                    className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                </div>
+              ) : !memoryData || memoryData.total_memories === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-gray-800 rounded-lg">
+                  <Brain className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <h3 className="text-lg font-medium text-white mb-2">No Memories Yet</h3>
+                  <p className="text-gray-400 mb-4 max-w-md mx-auto">
+                    Start using XMem to store your memories. They will appear here as an interactive brain visualization.
+                  </p>
+                  <a
+                    href="/docs"
+                    className="inline-flex items-center text-blue-400 hover:text-blue-300 text-sm"
+                  >
+                    Learn how to use XMem
+                    <ExternalLink className="h-3 w-3 ml-1" />
+                  </a>
+                </div>
+              ) : (
+                <div className="grid lg:grid-cols-4 gap-4">
+                  {/* 3D Brain Visualization */}
+                  <div className="lg:col-span-3 h-[400px] rounded-xl overflow-hidden border border-gray-800 bg-[#0a0a0a]">
+                    <Suspense fallback={
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    }>
+                      <MemoryBrain
+                        nodes={memoryData.nodes}
+                        edges={memoryData.edges}
+                        onNodeClick={setSelectedMemory}
+                      />
+                    </Suspense>
+                  </div>
+
+                  {/* Memory Details Sidebar */}
+                  <div className="lg:col-span-1 h-[400px]">
+                    <MemoryDetails
+                      node={selectedMemory}
+                      onClose={() => setSelectedMemory(null)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Legend */}
+              {memoryData && memoryData.total_memories > 0 && (
+                <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-gray-800">
+                  <span className="text-xs text-gray-500 uppercase tracking-wider">Memory Types:</span>
+                  {memoryData.domains.includes('temporal') && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#00e5ff]" style={{ boxShadow: '0 0 8px #00e5ff' }} />
+                      <span className="text-xs text-gray-400">Events</span>
+                    </div>
+                  )}
+                  {memoryData.domains.includes('profile') && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#ff00ea]" style={{ boxShadow: '0 0 8px #ff00ea' }} />
+                      <span className="text-xs text-gray-400">Profile</span>
+                    </div>
+                  )}
+                  {memoryData.domains.includes('summary') && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 8px #4ade80' }} />
+                      <span className="text-xs text-gray-400">Summaries</span>
+                    </div>
+                  )}
+                  <span className="text-xs text-gray-600 ml-auto">
+                    Click nodes to view details. Drag to rotate, scroll to zoom.
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
