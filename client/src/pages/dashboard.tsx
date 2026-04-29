@@ -461,7 +461,7 @@ export default function Dashboard() {
           </div>
 
           {/* Your Memories Panel */}
-          <Card className="bg-[#111] border-gray-800 overflow-hidden">
+          <Card className="mt-8 bg-[#111] border-gray-800 overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg text-white flex items-center gap-2">
