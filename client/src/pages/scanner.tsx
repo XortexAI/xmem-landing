@@ -1519,6 +1519,7 @@ export default function Scanner() {
                       onClick={() => { setActiveRepo(repo); setMessages([]); }}
                       className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 rounded-xl cursor-pointer transition-all duration-300"
                     >
+                      <div>
                         <h4 className="text-white/90 font-medium text-base mb-1">{repo.org}/{repo.repo}</h4>
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-1.5">
