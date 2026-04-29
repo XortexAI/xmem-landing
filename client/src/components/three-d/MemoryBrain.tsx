@@ -141,38 +141,37 @@ function MemoryEdgeLine({
   nodes: MemoryNode[];
   isHighlighted: boolean;
 }) {
-  const lineRef = useRef<THREE.Line>(null);
-
-  const { geometry, color } = useMemo(() => {
+  const lineObj = useMemo(() => {
     const sourceNode = nodes.find((n) => n.id === edge.source);
     const targetNode = nodes.find((n) => n.id === edge.target);
 
-    if (!sourceNode || !targetNode) {
-      return { geometry: new THREE.BufferGeometry(), color: new THREE.Color("#ffffff") };
-    }
-
     const sourcePos = new THREE.Vector3(
-      sourceNode.position_hint?.x ?? 0,
-      sourceNode.position_hint?.y ?? 0,
-      sourceNode.position_hint?.z ?? 0
+      sourceNode?.position_hint?.x ?? 0,
+      sourceNode?.position_hint?.y ?? 0,
+      sourceNode?.position_hint?.z ?? 0
     );
     const targetPos = new THREE.Vector3(
-      targetNode.position_hint?.x ?? 0,
-      targetNode.position_hint?.y ?? 0,
-      targetNode.position_hint?.z ?? 0
+      targetNode?.position_hint?.x ?? 0,
+      targetNode?.position_hint?.y ?? 0,
+      targetNode?.position_hint?.z ?? 0
     );
 
-    const points = [sourcePos, targetPos];
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const col = new THREE.Color(EDGE_COLORS[edge.type] || "#ffffff");
+    const geometry = new THREE.BufferGeometry().setFromPoints([sourcePos, targetPos]);
+    const color = new THREE.Color(EDGE_COLORS[edge.type] || "#ffffff");
+    const material = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: isHighlighted ? 0.5 : 0.15,
+      linewidth: isHighlighted ? 2 : 1,
+    });
 
-    return { geometry: geo, color: col };
-  }, [edge, nodes]);
+    return new THREE.Line(geometry, material);
+  }, [edge, nodes, isHighlighted]);
 
   // Pulsing animation for highlighted edges
   useFrame((state) => {
-    if (!lineRef.current || !lineRef.current.material) return;
-    const material = lineRef.current.material as THREE.LineBasicMaterial;
+    if (!lineObj.material) return;
+    const material = lineObj.material as THREE.LineBasicMaterial;
     if (isHighlighted) {
       material.opacity = 0.4 + Math.sin(state.clock.elapsedTime * 3) * 0.2;
     } else {
@@ -180,16 +179,7 @@ function MemoryEdgeLine({
     }
   });
 
-  return (
-    <line ref={lineRef} geometry={geometry}>
-      <lineBasicMaterial
-        color={color}
-        transparent
-        opacity={isHighlighted ? 0.5 : 0.15}
-        linewidth={isHighlighted ? 2 : 1}
-      />
-    </line>
-  );
+  return <primitive object={lineObj} />;
 }
 
 // Main scene component
