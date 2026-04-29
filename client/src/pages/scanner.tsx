@@ -1519,8 +1519,29 @@ export default function Scanner() {
                       onClick={() => { setActiveRepo(repo); setMessages([]); }}
                       className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 rounded-xl cursor-pointer transition-all duration-300"
                     >
-                      <div>
-                                  ) : !canChat && !scanError && (
+                        <h4 className="text-white/90 font-medium text-base mb-1">{repo.org}/{repo.repo}</h4>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <StatusDot status={repo.phase1_status} />
+                            <span className="text-[10px] text-white/30 uppercase tracking-widest">Phase 1</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <StatusDot status={repo.phase2_status} />
+                            <span className="text-[10px] text-white/30 uppercase tracking-widest">Phase 2</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 sm:mt-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg border border-white/10 transition-all">
+                          Open Index
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : !canChat && !scanError && (
               activeRepo.phase1_status === "running" || 
               activeRepo.phase1_status === "pending" || 
               activeRepo.phase1_status === "paused" ||
