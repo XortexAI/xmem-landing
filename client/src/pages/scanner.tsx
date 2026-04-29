@@ -17,6 +17,7 @@ import {
   Pause,
   Play,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -38,6 +39,7 @@ function authJsonHeaders(token: string | null): HeadersInit {
 interface RepoEntry {
   org: string;
   repo: string;
+  branch?: string;
   phase1_status: string;
   phase2_status: string;
   /** When true, any scanner user may query this index (saves re-scan cost for others). */
@@ -166,6 +168,9 @@ export default function Scanner() {
   const [estimates, setEstimates] = useState<ScanEstimates | null>(null);
   const [pausing, setPausing] = useState(false);
   const [resuming, setResuming] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [showSyncPat, setShowSyncPat] = useState(false);
+  const [syncPat, setSyncPat] = useState("");
 
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
@@ -226,6 +231,7 @@ export default function Scanner() {
           data.repos.map((r: RepoEntry) => ({
             org: r.org,
             repo: r.repo,
+            branch: r.branch,
             phase1_status: r.phase1_status || "not_started",
             phase2_status: r.phase2_status || "not_started",
             share_index_publicly:
@@ -687,6 +693,122 @@ export default function Scanner() {
       setInputError("Network error. Is the API server running?");
     } finally {
       setValidating(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!activeRepo || !username || syncing) return;
+    
+    setSyncing(true);
+    setScanError("");
+    const github_url = `https://github.com/${activeRepo.org}/${activeRepo.repo}`;
+    const targetBranch = activeRepo.branch || "main";
+
+    try {
+      // Step 1: If PAT is not already shown, validate URL to check if PAT is needed
+      if (!showSyncPat) {
+        const validateResp = await fetch(`${API_URL}/v1/scanner/validate-url`, {
+          method: "POST",
+          headers: authJsonHeaders(token),
+          body: JSON.stringify({
+            github_url,
+            pat: syncPat.trim(),
+            branch: targetBranch,
+          }),
+        });
+        const validateData = await validateResp.json();
+
+        if (validateData.status === "error") {
+          setScanError(validateData.error);
+          setSyncing(false);
+          return;
+        }
+
+        if (validateData.needs_pat || validateData.auth_error) {
+          setShowSyncPat(true);
+          setScanError("Repository is private. Please provide a Personal Access Token to sync.");
+          setSyncing(false);
+          return;
+        }
+      } else if (!syncPat.trim()) {
+        setScanError("Please enter a Personal Access Token to sync.");
+        setSyncing(false);
+        return;
+      }
+
+      // Step 2: Call the scan API with force_full: false
+      const resp = await fetch(`${API_URL}/v1/scanner/scan`, {
+        method: "POST",
+        headers: authJsonHeaders(token),
+        body: JSON.stringify({
+          github_url,
+          username,
+          pat: syncPat.trim(),
+          branch: targetBranch,
+          force_full: false,
+        }),
+      });
+
+      const data = await resp.json();
+      
+      setShowSyncPat(false);
+      setSyncPat("");
+      
+      if (data.status === "error") {
+        setScanError(data.error || "Failed to start sync");
+        return;
+      }
+
+      if (data.reused) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `status-sync-up-to-date-${Date.now()}`,
+            role: "status",
+            content: data.message || `Repository is already up to date.`,
+          },
+        ]);
+        return;
+      }
+
+      if (data.phase2_only) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `status-sync-p2-${Date.now()}`,
+            role: "status",
+            content: data.message || `Running Phase 2 (LLM enrichment) for the latest changes.`,
+          },
+        ]);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `status-sync-${Date.now()}`,
+            role: "status",
+            content: `Syncing new changes from branch '${targetBranch}'... Phase 1 (AST indexing) is running.`,
+          },
+        ]);
+      }
+
+      // Update the repo statuses
+      const updatedRepo: RepoEntry = {
+        ...activeRepo,
+        phase1_status: data.phase1_status || "running",
+        phase2_status: data.phase2_status || "pending",
+      };
+
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.org === updatedRepo.org && r.repo === updatedRepo.repo ? updatedRepo : r,
+        ),
+      );
+      setActiveRepo(updatedRepo);
+
+    } catch {
+      setScanError("Network error while trying to sync.");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -1706,6 +1828,52 @@ export default function Scanner() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
+                  {/* Sync Button */}
+                  {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={handleSync}
+                        disabled={syncing || resuming || pausing}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[10px] text-white/60 uppercase tracking-widest font-medium hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin text-white/80' : ''}`} />
+                        Sync
+                      </button>
+
+                      {/* Inline PAT Prompt for Sync */}
+                      {showSyncPat && (
+                        <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-[#111] border border-white/10 rounded-xl shadow-2xl z-[60]">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] text-white/40 uppercase tracking-widest font-medium">Private Repo</span>
+                            <button onClick={() => { setShowSyncPat(false); setSyncPat(""); }} className="text-white/30 hover:text-white/60">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-white/60 mb-2 leading-relaxed">
+                            A Personal Access Token is required to sync private repositories.
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="password"
+                              value={syncPat}
+                              onChange={(e) => setSyncPat(e.target.value)}
+                              placeholder="ghp_..."
+                              className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-white text-xs placeholder-white/20 focus:outline-none focus:border-white/25"
+                            />
+                            <button
+                              onClick={handleSync}
+                              disabled={!syncPat.trim() || syncing}
+                              className="px-2 py-1 bg-white text-black rounded text-xs font-medium disabled:opacity-50"
+                            >
+                              Sync
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Share Toggle - Only for personal catalog */}
                   {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
                     <div className="flex items-center space-x-2 relative">
