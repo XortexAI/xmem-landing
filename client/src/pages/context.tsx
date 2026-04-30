@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navbar } from "@/sections/Navbar";
-import { Link as LinkIcon, Download, User, Activity, Loader2, Upload } from "lucide-react";
+import { Link as LinkIcon, Download, User, Activity, Loader2, Upload, X, FileText } from "lucide-react";
 
 type MessagePair = {
   user_query: string;
@@ -275,7 +275,7 @@ export default function ContextImporter() {
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Context Importer</h1>
           <p className="text-lg text-white/60 max-w-2xl mx-auto">
-            Convert long chat threads from ChatGPT, Claude, and Gemini into compressed, usable memories.
+            Convert long chat threads from ChatGPT, Claude, Gemini, and Antigravity into compressed, usable memories.
           </p>
           {user?.username && (
             <p className="text-sm text-white/40 mt-3 font-mono">@{user.username}</p>
@@ -296,11 +296,17 @@ export default function ContextImporter() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 bg-white/10">
-                    <TabsTrigger value="link" className="data-[state=active]:bg-primary">
+                  <TabsList className="grid w-full grid-cols-2 bg-white/10 p-1 rounded-lg">
+                    <TabsTrigger 
+                      value="link" 
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-white/60 hover:text-white"
+                    >
                       Share Link
                     </TabsTrigger>
-                    <TabsTrigger value="file" className="data-[state=active]:bg-primary">
+                    <TabsTrigger 
+                      value="file" 
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-white/60 hover:text-white"
+                    >
                       Upload File
                     </TabsTrigger>
                   </TabsList>
@@ -321,21 +327,50 @@ export default function ContextImporter() {
                   <TabsContent value="file" className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-white/80">
-                        Transcript File (.txt, .md, .json)
+                        Transcript File (.txt, .md, .json, .jsonl)
                       </label>
-                      <div className="flex items-center gap-3">
-                        <Input
-                          type="file"
-                          accept=".txt,.md,.json,.jsonl"
-                          onChange={(e) => setFile(e.target.files?.[0] || null)}
-                          className="bg-black/50 border-white/20 focus:border-primary text-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary/90"
-                          disabled={isProcessing}
-                        />
+                      <div className="mt-2">
+                        <label
+                          htmlFor="file-upload"
+                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-white/20 border-dashed rounded-lg cursor-pointer bg-black/50 hover:bg-white/5 transition-colors group"
+                        >
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <Upload className="w-8 h-8 mb-3 text-white/40 group-hover:text-primary transition-colors" />
+                            <p className="mb-2 text-sm text-white/60">
+                              <span className="font-semibold text-primary">Click to upload</span> or drag and drop
+                            </p>
+                            <p className="text-xs text-white/40">Supported: Cursor &amp; Antigravity transcript exports (.txt, .md, .json)</p>
+                          </div>
+                          <Input
+                            id="file-upload"
+                            type="file"
+                            className="hidden"
+                            accept=".txt,.md,.json,.jsonl"
+                            onChange={(e) => setFile(e.target.files?.[0] || null)}
+                            disabled={isProcessing}
+                          />
+                        </label>
                       </div>
                       {file && (
-                        <p className="text-sm text-white/60">
-                          Selected: {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                        </p>
+                        <div className="flex items-center gap-3 p-3 mt-4 rounded-md bg-white/5 border border-white/10">
+                          <div className="w-10 h-10 rounded bg-primary/20 flex items-center justify-center text-primary shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                            <p className="text-xs text-white/60">{(file.size / 1024).toFixed(2)} KB</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+                            onClick={() => setFile(null)}
+                            disabled={isProcessing}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </TabsContent>
