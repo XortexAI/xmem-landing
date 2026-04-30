@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navbar } from "@/sections/Navbar";
-import { Link as LinkIcon, Download, User, Activity, Loader2 } from "lucide-react";
+import { Link as LinkIcon, Download, User, Activity, Loader2, Upload } from "lucide-react";
 
 type MessagePair = {
   user_query: string;
@@ -22,6 +23,8 @@ export default function ContextImporter() {
   const { toast } = useToast();
   const { user, token, isAuthenticated, isLoading } = useAuth();
   const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState("link");
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
@@ -61,10 +64,19 @@ export default function ContextImporter() {
 
     const userId = user.username ?? user.id;
 
-    if (!url) {
+    if (activeTab === "link" && !url) {
       toast({
         title: "URL Required",
         description: "Please enter a valid chat share link.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (activeTab === "file" && !file) {
+      toast({
+        title: "File Required",
+        description: "Please select a transcript file to upload.",
         variant: "destructive",
       });
       return;
@@ -74,27 +86,51 @@ export default function ContextImporter() {
       setIsProcessing(true);
       setIsComplete(false);
       setProgress(10);
-      setCurrentStep("Scraping chat link...");
       setStats(null);
       setMemories([]);
       setFoundPairs(0);
       setFormedPairs(0);
 
-      const scrapeRes = await fetch(`${API_URL}/v1/memory/scrape`, {
-        method: "POST",
-        headers: authJsonHeaders(token),
-        body: JSON.stringify({ url }),
-      });
+      let pairs: MessagePair[] = [];
 
-      if (!scrapeRes.ok) {
-        throw new Error("Failed to parse the chat link.");
+      if (activeTab === "link") {
+        setCurrentStep("Scraping chat link...");
+        const scrapeRes = await fetch(`${API_URL}/v1/memory/scrape`, {
+          method: "POST",
+          headers: authJsonHeaders(token),
+          body: JSON.stringify({ url }),
+        });
+
+        if (!scrapeRes.ok) {
+          throw new Error("Failed to parse the chat link.");
+        }
+
+        const scrapeData = await scrapeRes.json();
+        pairs = scrapeData.data?.pairs || [];
+      } else {
+        setCurrentStep("Parsing transcript file...");
+        const formData = new FormData();
+        formData.append("file", file!);
+
+        const parseRes = await fetch(`${API_URL}/v1/memory/parse_transcript`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!parseRes.ok) {
+          const errorData = await parseRes.json();
+          throw new Error(errorData.error || "Failed to parse the transcript file.");
+        }
+
+        const parseData = await parseRes.json();
+        pairs = parseData.data?.pairs || [];
       }
 
-      const scrapeData = await scrapeRes.json();
-      const pairs: MessagePair[] = scrapeData.data?.pairs || [];
-
       if (pairs.length === 0) {
-        throw new Error("No messages found in the provided link.");
+        throw new Error("No messages found in the provided source.");
       }
 
       setFoundPairs(pairs.length);
@@ -255,26 +291,61 @@ export default function ContextImporter() {
                   Import Context
                 </CardTitle>
                 <CardDescription className="text-white/60">
-                  Paste a public share link to extract context and create memories.
+                  Paste a public share link or upload a transcript file to extract context and create memories.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-white/80">Chat URL (Public Share Link)</label>
-                  <Input
-                    placeholder="https://chatgpt.com/share/..."
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className="bg-black/50 border-white/20 focus:border-primary text-white"
-                    disabled={isProcessing}
-                  />
-                </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-white/10">
+                    <TabsTrigger value="link" className="data-[state=active]:bg-primary">
+                      Share Link
+                    </TabsTrigger>
+                    <TabsTrigger value="file" className="data-[state=active]:bg-primary">
+                      Upload File
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="link" className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">Chat URL (Public Share Link)</label>
+                      <Input
+                        placeholder="https://chatgpt.com/share/..."
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        className="bg-black/50 border-white/20 focus:border-primary text-white"
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="file" className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">
+                        Transcript File (.txt, .md, .json)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          type="file"
+                          accept=".txt,.md,.json,.jsonl"
+                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          className="bg-black/50 border-white/20 focus:border-primary text-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary/90"
+                          disabled={isProcessing}
+                        />
+                      </div>
+                      {file && (
+                        <p className="text-sm text-white/60">
+                          Selected: {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
 
                 <Button
                   className="w-full mt-4"
                   size="lg"
                   onClick={handleProcess}
-                  disabled={isProcessing || !url}
+                  disabled={isProcessing || (activeTab === "link" ? !url : !file)}
                 >
                   {isProcessing ? (
                     <span className="flex items-center gap-2">
@@ -283,7 +354,7 @@ export default function ContextImporter() {
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
+                      {activeTab === "link" ? <User className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
                       Sync Memories
                     </span>
                   )}
