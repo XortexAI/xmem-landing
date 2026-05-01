@@ -18,6 +18,7 @@ import {
   Code2,
   Download,
   FileText,
+  Github,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -26,11 +27,63 @@ import {
   ScanSearch,
   ShieldCheck,
   Sparkles,
+  Star,
   Terminal,
 } from "lucide-react";
 
 const extensionVideoUrl =
   "https://github.com/user-attachments/assets/8e3349ab-63c9-4046-821d-ca8097948440";
+
+const GITHUB_REPO = "XortexAI/Xmem";
+const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+
+function GitHubStarButton() {
+  const [stars, setStars] = useState<number | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchStars = async () => {
+      try {
+        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`);
+        if (!response.ok) throw new Error("Failed to fetch");
+        const data = await response.json();
+        setStars(data.stargazers_count);
+      } catch {
+        setError(true);
+      }
+    };
+    fetchStars();
+  }, []);
+
+  const formatStars = (count: number) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}k`;
+    }
+    return count.toString();
+  };
+
+  return (
+    <a
+      href={GITHUB_REPO_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white/80 transition-all hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+    >
+      <Github className="h-4 w-4" />
+      <span className="hidden sm:inline">Star</span>
+      <span className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs">
+        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+        {stars !== null ? (
+          formatStars(stars)
+        ) : error ? (
+          "—"
+        ) : (
+          <span className="animate-pulse">...</span>
+        )}
+      </span>
+    </a>
+  );
+}
 
 function MegaLink({
   href,
@@ -249,6 +302,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <GitHubStarButton />
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
