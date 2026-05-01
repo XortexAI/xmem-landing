@@ -14,6 +14,7 @@ import Dashboard from "@/pages/dashboard";
 import SetUsername from "@/pages/set-username";
 import DocsPage from "@/pages/docs";
 import Enterprise from "@/pages/enterprise";
+import AuthMcp from "@/pages/auth-mcp";
 
 function Router() {
   return (
@@ -36,6 +37,7 @@ function Router() {
         <RequireUsername component={Enterprise} />
       </Route>
       <Route path="/docs" component={DocsPage} />
+      <Route path="/auth/mcp" component={AuthMcp} />
       <Route component={NotFound} />
     </Switch>
   );
