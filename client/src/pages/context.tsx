@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navbar } from "@/sections/Navbar";
+import { Footer } from "@/sections/Footer";
 import { Link as LinkIcon, Download, User, Activity, Loader2, Upload, X, FileText } from "lucide-react";
 
 type MessagePair = {
@@ -479,7 +480,7 @@ export default function ContextImporter() {
                       onClick={handleDownload}
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Download Text
+                      Download Context
                     </Button>
                   </div>
                 )}
@@ -488,6 +489,8 @@ export default function ContextImporter() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

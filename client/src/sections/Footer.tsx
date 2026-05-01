@@ -1,31 +1,22 @@
-import { Brain } from "lucide-react";
+import { Link } from "wouter";
+import { Github } from "lucide-react";
 
 export function Footer() {
   return (
     <footer
-      className="relative py-20 border-t"
+      className="relative py-16 border-t"
       style={{ background: "#050505", borderColor: "rgba(255,255,255,0.06)" }}
     >
       <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
           <div className="col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div
-                className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                }}
-              >
-                <Brain className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span
-                className="text-white font-bold text-lg"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                xmem
-              </span>
-            </div>
+            <Link href="/" className="flex items-center gap-2 mb-4 cursor-pointer">
+              <img
+                src="/logo.png"
+                alt="Xmem"
+                className="h-8 w-auto invert"
+              />
+            </Link>
             <p className="text-white/35 text-sm leading-relaxed max-w-xs">
               Memory infrastructure for the machine age. Built for autonomous AI
               systems.
@@ -34,15 +25,19 @@ export function Footer() {
           {[
             {
               title: "Product",
-              links: ["Features", "Architecture", "Security", "Changelog"],
+              links: [
+                { label: "Scanner", href: "/scanner" },
+                { label: "Context", href: "/context" },
+                { label: "Documentation", href: "/docs" },
+              ],
             },
             {
-              title: "Developers",
-              links: ["Documentation", "SDK Reference", "CLI", "Status"],
-            },
-            {
-              title: "Company",
-              links: ["About", "Blog", "Careers", "Contact"],
+              title: "Resources",
+              links: [
+                { label: "API Reference", href: "/docs#api" },
+                { label: "Quickstart", href: "/docs#quickstart" },
+                { label: "Architecture", href: "/docs#architecture" },
+              ],
             },
           ].map((col) => (
             <div key={col.title}>
@@ -51,13 +46,13 @@ export function Footer() {
               </div>
               <div className="space-y-2.5">
                 {col.links.map((link) => (
-                  <a
-                    key={link}
-                    href="#"
-                    className="block text-sm text-white/30 hover:text-white/70 transition-colors"
+                  <Link
+                    key={link.label}
+                    href={link.href}
+                    className="block text-sm text-white/30 hover:text-white/70 transition-colors cursor-pointer"
                   >
-                    {link}
-                  </a>
+                    {link.label}
+                  </Link>
                 ))}
               </div>
             </div>
@@ -70,16 +65,16 @@ export function Footer() {
           <div className="text-xs text-white/20">
             © 2026 Xmem Inc. All rights reserved.
           </div>
-          <div className="flex gap-6">
-            {["Privacy", "Terms", "Security"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="text-xs text-white/20 hover:text-white/40 transition-colors"
-              >
-                {link}
-              </a>
-            ))}
+          <div className="flex items-center gap-6">
+            <a
+              href="https://github.com/XortexAI/Xmem"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-white/30 hover:text-white/60 transition-colors"
+            >
+              <Github className="w-3.5 h-3.5" />
+              GitHub
+            </a>
           </div>
         </div>
       </div>

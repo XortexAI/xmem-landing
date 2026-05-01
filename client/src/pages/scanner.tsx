@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Navbar } from "@/sections/Navbar";
 
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 
@@ -90,7 +91,7 @@ function LoginPromptScreen() {
 
   return (
     <div
-      className="dark min-h-screen flex items-center justify-center"
+      className="dark min-h-screen flex items-center justify-center pt-20"
       style={{ background: "#080808" }}
     >
       <div className="absolute inset-0 grid-pattern opacity-20" />
@@ -1104,7 +1105,12 @@ export default function Scanner() {
   }
 
   if (!isAuthenticated || !token) {
-    return <LoginPromptScreen />;
+    return (
+      <>
+        <Navbar />
+        <LoginPromptScreen />
+      </>
+    );
   }
 
   const canChat = activeRepo?.phase1_status === "complete" && 
@@ -1116,56 +1122,49 @@ export default function Scanner() {
       className="dark min-h-screen flex flex-col"
       style={{ background: "#080808" }}
     >
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <header
-        className="flex items-center justify-between px-4 md:px-6 py-4 flex-shrink-0"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
-      >
-        <div className="flex items-center gap-3 md:gap-4">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="md:hidden text-white/70 hover:text-white transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <a href="/">
-            <img src="/logo.png" alt="XMem" className="h-6 md:h-7 w-auto invert" />
-          </a>
-          <div className="hidden md:block w-px h-5 bg-white/10" />
-          <span className="hidden md:inline text-xs text-white/40 uppercase tracking-widest">
-            Scanner
-          </span>
-        </div>
-        <div className="flex items-center gap-3 md:gap-4">
-          <span className="text-xs md:text-sm text-white/50 truncate max-w-[100px] md:max-w-none">
-            {user?.username ?? user?.name}
-          </span>
-          <button
-            onClick={handleLogout}
-            className="text-xs text-white/30 hover:text-white/60 transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
+      <Navbar />
 
-      {/* ── Body ────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Mobile backdrop */}
-        {isSidebarOpen && (
-          <div 
-            className="absolute inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" 
-            onClick={() => setIsSidebarOpen(false)} 
-          />
-        )}
-        
-        {/* ── Left Panel ──────────────────────────────────────────── */}
-        <aside
-          className={`absolute md:relative z-50 w-72 md:w-80 h-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden bg-[#0a0a0a] transform ${
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0 transition-transform duration-300 ease-in-out`}
-          style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
-        >
+      {/* ── Scanner Content (with padding for fixed navbar) ───────────── */}
+      <div className="pt-16 flex-1 flex flex-col min-h-0">
+        {/* Main scanner area - responsive flex layout */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Mobile Menu Button - Only show when no active repo */}
+          {!activeRepo && (
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className={`absolute top-3 left-3 z-20 md:hidden p-2 rounded-lg bg-white/10 border border-white/10 text-white/70 hover:text-white hover:bg-white/15 transition-all ${isSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Mobile backdrop */}
+          {isSidebarOpen && (
+            <div
+              className="absolute inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+          )}
+
+          {/* ── Left Panel (Sidebar) ───────────────────────────────── */}
+          <aside
+            className={`absolute md:relative z-50 w-72 md:w-80 h-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden bg-[#0a0a0a] transform ${
+              isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            } md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none`}
+            style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            {/* Close button for mobile */}
+            <div className="md:hidden flex items-center justify-between p-3 border-b border-white/5">
+              <span className="text-sm font-medium text-white/80">Menu</span>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           <div
             className="flex-shrink-0 flex gap-1 p-2"
             style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
@@ -1700,24 +1699,34 @@ export default function Scanner() {
           ) : (
             <>
               {/* Chat Header */}
-              <div className="border-b border-white/5 p-4 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-10 rounded-t-2xl">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-white font-medium flex items-center space-x-2" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    <MessageSquare size={16} className="text-blue-400" />
-                    <span>XMem Knowledge Graph</span>
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xs text-white/40">{activeRepo.org}/{activeRepo.repo}</p>
-                    {activeRepo.phase1_status === "complete" && (
-                      activeRepo.share_index_publicly !== false ? (
-                        <Globe className="w-3 h-3 text-emerald-400/50" />
-                      ) : (
-                        <Lock className="w-3 h-3 text-white/20" />
-                      )
-                    )}
+              <div className="border-b border-white/5 p-3 md:p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-black/40 backdrop-blur-md sticky top-0 z-10 rounded-t-2xl">
+                <div className="min-w-0 flex-1 flex items-center gap-2">
+                  {/* Mobile menu button when repo is active */}
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="md:hidden p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                    aria-label="Open sidebar"
+                  >
+                    <Menu className="w-4 h-4" />
+                  </button>
+                  <div className="min-w-0 overflow-hidden">
+                    <h3 className="text-white font-medium flex items-center gap-2 text-sm md:text-base" style={{ fontFamily: "'Inter', sans-serif" }}>
+                      <MessageSquare size={16} className="text-blue-400 shrink-0 hidden sm:block" />
+                      <span className="truncate">XMem Knowledge Graph</span>
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-white/40 truncate">{activeRepo.org}/{activeRepo.repo}</p>
+                      {activeRepo.phase1_status === "complete" && (
+                        activeRepo.share_index_publicly !== false ? (
+                          <Globe className="w-3 h-3 text-emerald-400/50 shrink-0" />
+                        ) : (
+                          <Lock className="w-3 h-3 text-white/20 shrink-0" />
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-2 md:gap-4 flex-wrap">
                   {/* Sync Button */}
                   {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
                     <div className="relative">
@@ -1725,10 +1734,10 @@ export default function Scanner() {
                         type="button"
                         onClick={handleSync}
                         disabled={syncing}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[10px] text-white/60 uppercase tracking-widest font-medium hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                        className="flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[10px] text-white/60 uppercase tracking-widest font-medium hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
                       >
                         <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin text-white/80' : ''}`} />
-                        Sync
+                        <span className="hidden sm:inline">Sync</span>
                       </button>
 
                       {/* Inline PAT Prompt for Sync */}
@@ -1766,13 +1775,13 @@ export default function Scanner() {
 
                   {/* Share Toggle - Only for personal catalog */}
                   {activeRepo.phase1_status === "complete" && scannerTab === "mine" && (
-                    <div className="flex items-center space-x-2 relative">
+                    <div className="flex items-center gap-1.5 relative">
                       <span
                         onMouseEnter={() => setShowShareTooltip(true)}
                         onMouseLeave={() => setShowShareTooltip(false)}
-                        className="text-[10px] text-white/40 uppercase tracking-widest font-bold cursor-default hover:text-white/60 transition-colors"
+                        className="text-[10px] text-white/40 uppercase tracking-widest font-bold cursor-default hover:text-white/60 transition-colors hidden md:inline"
                       >
-                        Public index
+                        Public
                       </span>
 
                       {showShareTooltip && (
@@ -1810,18 +1819,9 @@ export default function Scanner() {
                     <div className="w-px h-3 bg-white/10" />
                   )}
 
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[11px] text-white/40 uppercase tracking-widest font-medium">Debug Mode</span>
-                    <button 
-                      onClick={() => setDebugMode(!debugMode)}
-                      className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${debugMode ? 'bg-blue-500/80' : 'bg-white/10'}`}
-                    >
-                      <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-300 ${debugMode ? 'translate-x-4' : 'translate-x-0'}`} />
-                    </button>
-                  </div>
                   <button
                     onClick={() => setActiveRepo(null)}
-                    className="text-xs text-white/40 hover:text-white transition-colors uppercase tracking-widest"
+                    className="text-[11px] md:text-xs text-white/40 hover:text-white transition-colors uppercase tracking-widest shrink-0"
                   >
                     Close
                   </button>
@@ -1950,6 +1950,22 @@ export default function Scanner() {
             </>
           )}
         </main>
+        </div>
+
+        {/* ── Minimal Footer ─────────────────────────────────────────── */}
+        <footer className="flex-shrink-0 py-3 px-4 border-t border-white/5 bg-[#0a0a0a]">
+          <div className="flex items-center justify-between text-[11px] text-white/25">
+            <span>© 2026 Xmem Inc.</span>
+            <a
+              href="https://github.com/XortexAI/Xmem"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white/50 transition-colors"
+            >
+              GitHub
+            </a>
+          </div>
+        </footer>
       </div>
     </div>
   );
