@@ -144,46 +144,56 @@ export default function ContextImporter() {
 
       setLiveStats({ initialTokens: 0, tokensAfter: 0 });
 
-      for (let i = 0; i < pairs.length; i++) {
-        const pair = pairs[i];
+      const BATCH_SIZE = 3;
+      for (let i = 0; i < pairs.length; i += BATCH_SIZE) {
+        const batch = pairs.slice(i, i + BATCH_SIZE);
         setFormedPairs(i);
-        setCurrentStep(`Forming context ${i + 1} of ${pairs.length}...`);
+        setCurrentStep(`Forming context ${i + 1}-${Math.min(i + BATCH_SIZE, pairs.length)} of ${pairs.length}...`);
 
-        totalInitialTokens += estimateTokens(pair.user_query) + estimateTokens(pair.agent_response);
+        const batchPromises = batch.map(async (pair, idx) => {
+          const currentIdx = i + idx;
+          const ingestRes = await fetch(`${API_URL}/v1/memory/ingest`, {
+            method: "POST",
+            headers: authJsonHeaders(token),
+            body: JSON.stringify({
+              user_query: pair.user_query,
+              agent_response: pair.agent_response,
+              user_id: userId,
+              effort_level: "low",
+            }),
+          });
 
-        const ingestRes = await fetch(`${API_URL}/v1/memory/ingest`, {
-          method: "POST",
-          headers: authJsonHeaders(token),
-          body: JSON.stringify({
-            user_query: pair.user_query,
-            agent_response: pair.agent_response,
-            user_id: userId,
-            effort_level: "low",
-          }),
+          if (!ingestRes.ok) {
+            throw new Error(`Memory ingest failed while forming context ${currentIdx + 1} of ${pairs.length}.`);
+          }
+
+          const ingestData = await ingestRes.json();
+          return { pair, ingestData };
         });
 
-        if (!ingestRes.ok) {
-          throw new Error(`Memory ingest failed while forming context ${i + 1} of ${pairs.length}.`);
-        }
+        const results = await Promise.all(batchPromises);
 
-        const ingestData = await ingestRes.json();
+        for (const { pair, ingestData } of results) {
+          totalInitialTokens += estimateTokens(pair.user_query) + estimateTokens(pair.agent_response);
 
-        for (const domain of ["profile", "temporal", "summary"] as const) {
-          const domainResult = ingestData.data?.[domain];
-          if (!domainResult) continue;
+          for (const domain of ["profile", "temporal", "summary"] as const) {
+            const domainResult = ingestData.data?.[domain];
+            if (!domainResult) continue;
 
-          const ops = domainResult.operations || [];
-          ops.forEach((op: { type?: string; content?: string }) => {
-            if (op.content && op.type !== "noop" && op.type !== "delete") {
-              allMemories.push(op.content);
-              totalMemoriesTokens += estimateTokens(op.content);
-            }
-          });
+            const ops = domainResult.operations || [];
+            ops.forEach((op: { type?: string; content?: string }) => {
+              if (op.content && op.type !== "noop" && op.type !== "delete") {
+                allMemories.push(op.content);
+                totalMemoriesTokens += estimateTokens(op.content);
+              }
+            });
+          }
         }
 
         setLiveStats({ initialTokens: totalInitialTokens, tokensAfter: totalMemoriesTokens });
-        setFormedPairs(i + 1);
-        setProgress(10 + Math.floor(((i + 1) / pairs.length) * 90));
+        const processed = Math.min(i + BATCH_SIZE, pairs.length);
+        setFormedPairs(processed);
+        setProgress(10 + Math.floor((processed / pairs.length) * 90));
       }
 
       const savedTokens = Math.max(totalInitialTokens - totalMemoriesTokens, 0);
