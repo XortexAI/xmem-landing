@@ -39,7 +39,7 @@ export function HeroSection() {
           }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
-          Memory as a Service
+          India's #1 Open-Source Memory Layer
         </motion.div>
 
         <motion.h1
@@ -49,9 +49,9 @@ export function HeroSection() {
           className="text-6xl md:text-8xl font-bold text-white mb-6 leading-none"
           style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: 0 }}
         >
-          Memory for the
+          Open-Source
           <br />
-          <span className="gradient-text">Machine Age</span>
+          <span className="gradient-text">Memory Layer</span> for AI Agents
         </motion.h1>
 
         <motion.p
@@ -60,8 +60,7 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.5 }}
           className="text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-12 leading-relaxed"
         >
-          Persistent, portable memory infrastructure for AI agents,
-          <br className="hidden md:block" /> copilots, and autonomous systems.
+          XMem is a persistent, multimodal memory layer for AI agents. It helps LLM apps remember user preferences, project context, temporal events, code knowledge, and conversation summaries across sessions, tools, and models.
         </motion.p>
 
         <motion.div

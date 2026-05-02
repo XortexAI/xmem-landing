@@ -18,8 +18,7 @@ export function Footer() {
               />
             </Link>
             <p className="text-white/35 text-sm leading-relaxed max-w-xs">
-              Memory infrastructure for the machine age. Built for autonomous AI
-              systems.
+              India's #1 open-source memory layer for AI agents. Built for the machine age.
             </p>
           </div>
           {[

@@ -299,6 +299,10 @@ export function Navbar() {
               </div>
             </div>
           </MegaMenu>
+
+          <Link href="/blog" className="text-sm text-gray-300 transition-colors hover:text-white">
+            Blog
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">
