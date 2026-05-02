@@ -16,6 +16,7 @@ import DocsPage from "@/pages/docs";
 import Enterprise from "@/pages/enterprise";
 import AuthMcp from "@/pages/auth-mcp";
 import OAuthAuthorize from "@/pages/oauth-authorize";
+import Privacy from "@/pages/privacy";
 
 function Router() {
   return (
@@ -38,6 +39,7 @@ function Router() {
         <RequireUsername component={Enterprise} />
       </Route>
       <Route path="/docs" component={DocsPage} />
+      <Route path="/privacy" component={Privacy} />
       <Route path="/auth/mcp" component={AuthMcp} />
       <Route path="/oauth/authorize" component={OAuthAuthorize} />
       <Route component={NotFound} />
