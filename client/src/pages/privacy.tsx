@@ -3,7 +3,7 @@ import { Footer } from "@/sections/Footer";
 
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="dark min-h-screen bg-background text-foreground relative" style={{ background: "#080808" }}>
       <Navbar />
       <main className="container mx-auto px-4 py-16 max-w-4xl pt-24">
         <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
