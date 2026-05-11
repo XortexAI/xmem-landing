@@ -350,7 +350,7 @@ export default function ContextImporter() {
                             <p className="mb-2 text-sm text-white/60">
                               <span className="font-semibold text-primary">Click to upload</span> or drag and drop
                             </p>
-                            <p className="text-xs text-white/40">Supported: Cursor &amp; Antigravity transcript exports (.txt, .md, .json)</p>
+                            <p className="text-xs text-white/40">Supported: Cursor, Antigravity &amp; Claude Code transcript exports (.txt, .md, .json, .jsonl)</p>
                           </div>
                           <Input
                             id="file-upload"
