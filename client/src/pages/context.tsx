@@ -103,7 +103,8 @@ export default function ContextImporter() {
         });
 
         if (!scrapeRes.ok) {
-          throw new Error("Failed to parse the chat link.");
+          const errorData = await scrapeRes.json().catch(() => null);
+          throw new Error(errorData?.error || "Failed to parse the chat link.");
         }
 
         const scrapeData = await scrapeRes.json();
@@ -326,12 +327,15 @@ export default function ContextImporter() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-white/80">Chat URL (Public Share Link)</label>
                       <Input
-                        placeholder="https://chatgpt.com/share/..."
+                        placeholder="https://chatgpt.com/share/... or https://claude.ai/share/..."
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         className="bg-black/50 border-white/20 focus:border-primary text-white"
                         disabled={isProcessing}
                       />
+                      <p className="text-xs text-white/40">
+                        Supports public ChatGPT, Claude, and Gemini share links.
+                      </p>
                     </div>
                   </TabsContent>
                   
