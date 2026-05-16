@@ -12,9 +12,6 @@ import { Footer } from '@/sections/Footer';
 const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-// Debug logging (remove in production)
-console.log("[Login] VITE_GOOGLE_CLIENT_ID:", GOOGLE_CLIENT_ID ? "Set (hidden)" : "NOT SET");
-console.log("[Login] All env vars:", import.meta.env);
 
 // Use the type from @react-oauth/google
 import type { CredentialResponse } from '@react-oauth/google';
