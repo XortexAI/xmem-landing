@@ -15,6 +15,7 @@ import { HowItWorksSection } from "../sections/HowItWorksSection";
 import { AgenticSection } from "../sections/AgenticSection";
 import { EnterpriseSection } from "../sections/EnterpriseSection";
 import { DeveloperSection } from "../sections/DeveloperSection";
+import { ConnectorsSection } from "../sections/ConnectorsSection";
 import { UseCasesSection } from "../sections/UseCasesSection";
 import { VisionSection } from "../sections/VisionSection";
 import { CTASection } from "../sections/CTASection";
@@ -76,6 +77,7 @@ export default function Home() {
         <AgenticSection />
         <EnterpriseSection />
         <DeveloperSection />
+        <ConnectorsSection />
         <UseCasesSection />
         <VisionSection />
         <CTASection />
