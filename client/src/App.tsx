@@ -51,6 +51,7 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/auth/mcp" component={AuthMcp} />
       <Route path="/auth/connect" component={AuthConnect} />
+      <Route path="/auth/connect/:connector" component={AuthConnect} />
       <Route path="/oauth/authorize" component={OAuthAuthorize} />
       <Route path="/memory-layer-for-ai-agents">
         <SeoPage title="Memory Layer for AI Agents" description="Learn how XMem acts as a persistent memory layer for AI agents, enabling long-term context and recall." />

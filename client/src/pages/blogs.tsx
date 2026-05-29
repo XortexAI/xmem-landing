@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, CalendarDays, Clock3, Newspaper, Tag } from "lucide-react";
@@ -18,6 +19,37 @@ function formatDate(date: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(date));
+}
+
+function setMeta(name: string, content: string, property = false) {
+  const selector = property ? `meta[property="${name}"]` : `meta[name="${name}"]`;
+  let tag = document.head.querySelector<HTMLMetaElement>(selector);
+
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute(property ? "property" : "name", name);
+    document.head.appendChild(tag);
+  }
+
+  tag.content = content;
+}
+
+function useBlogSeo(slug: string) {
+  useEffect(() => {
+    const post = slug ? getBlogPost(slug) : null;
+    const title = post ? `${post.title} | XMem Blog` : "XMem Blog | Memory Layer Updates";
+    const description =
+      post?.description ||
+      "Architecture notes, product updates, connector deep dives, and field reports from building XMem.";
+
+    document.title = title;
+    setMeta("description", description);
+    setMeta("og:title", title, true);
+    setMeta("og:description", description, true);
+    setMeta("og:type", "article", true);
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
+  }, [slug]);
 }
 
 function BlogIndex() {
@@ -168,6 +200,7 @@ function BlogPostPage({ slug }: { slug: string }) {
 export default function BlogsPage() {
   const [location] = useLocation();
   const slug = blogSlugFromLocation(location);
+  useBlogSeo(slug);
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">

@@ -314,7 +314,7 @@ function PrimitiveSection() {
             </h2>
           </div>
           <p className="max-w-2xl text-base leading-8 text-black/60 lg:justify-self-end">
-            The new landing page leads with the system XMem actually gives builders: ingest, judge, store, retrieve, and share context across every place an agent works.
+            XMem gives builders a complete memory control plane: ingest, judge, store, retrieve, and share context across every place an agent works.
           </p>
         </div>
 
@@ -348,7 +348,7 @@ function StackComparisonSection() {
               Replace the context glue with one memory control plane.
             </h2>
             <p className="mt-5 text-base leading-8 text-white/60">
-              Inspired by the best current infra pages, this section makes the problem visual: most teams wire together state, RAG, memory, and tools. XMem turns those pieces into one inspectable graph.
+              Most teams wire together state, RAG, memory, and tools separately. XMem turns those pieces into one inspectable memory control plane.
             </p>
           </div>
 
@@ -414,7 +414,7 @@ function DemoSection() {
               Import context once. Reuse it everywhere.
             </h2>
             <p className="mt-5 max-w-xl text-base leading-8 text-white/60">
-              The landing page now shows a practical loop: scan a repo, import conversations, attach MCP, and give the next agent a clean memory bundle instead of a pasted wall of text.
+              Scan a repo, import conversations, attach MCP, and give the next agent a clean memory bundle instead of a pasted wall of text.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -466,7 +466,7 @@ function DeveloperSection() {
               A memory layer developers can reason about.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-8 text-black/60">
-              The page avoids vague AI magic and shows concrete surfaces: commands, memory objects, domains, routing, and inspection.
+              No vague AI magic: concrete surfaces your team can reason about, including commands, memory objects, domains, routing, and inspection.
             </p>
           </div>
 

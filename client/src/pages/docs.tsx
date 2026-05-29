@@ -954,7 +954,7 @@ export default function DocsPage() {
                 <KeyRound className="h-4 w-4 text-[#b8ff65]" />
                 Active API header
               </div>
-              <CodeBlock code={`Authorization: Bearer ${token}`} />
+              <CodeBlock code={`Authorization: Bearer ${token.substring(0, 24)}...`} />
             </div>
           )}
 
