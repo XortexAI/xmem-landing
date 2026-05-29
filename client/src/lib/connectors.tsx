@@ -341,7 +341,11 @@ export const defaultConnector = connectors[0];
 
 export function getConnector(id?: string | null): Connector {
   if (!id) return defaultConnector;
-  return connectors.find((connector) => connector.id === id) ?? defaultConnector;
+  const connector = connectors.find((item) => item.id === id);
+  if (!connector) {
+    console.warn(`[connectors] Unknown connector id: "${id}", falling back to default.`);
+  }
+  return connector ?? defaultConnector;
 }
 
 function normalizeKeyName(name?: string) {

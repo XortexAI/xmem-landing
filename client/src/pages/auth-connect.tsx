@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Redirect, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -65,7 +65,7 @@ function appendConnectionParams(callback: string, params: Record<string, string>
 
 export default function AuthConnect() {
   const { isAuthenticated, user, token, hasUsername } = useAuth();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -77,8 +77,8 @@ export default function AuthConnect() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const connector = useMemo(() => getConnector(getConnectorIdFromUrl()), [location]);
-  const callbackUrl = useMemo(() => getCallbackUrl(), [location]);
+  const connector = getConnector(getConnectorIdFromUrl());
+  const callbackUrl = getCallbackUrl();
   const returnUrl = `${window.location.pathname}${window.location.search}`;
   const hasCallback = Boolean(callbackUrl);
   const callbackIsSafe = !callbackUrl || isSafeLocalCallback(callbackUrl);
