@@ -49,7 +49,7 @@ function getCallbackUrl() {
 function isSafeLocalCallback(callback: string) {
   try {
     const url = new URL(callback);
-    return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   } catch {
     return false;
   }
@@ -94,8 +94,10 @@ export default function AuthConnect() {
   };
 
   const copyText = (value: string, key: string) => {
-    void navigator.clipboard.writeText(value);
-    flashCopied(key);
+    navigator.clipboard.writeText(value).then(
+      () => flashCopied(key),
+      () => setError("Failed to copy to clipboard. Please copy manually."),
+    );
   };
 
   const createConnectorKey = async (redirectToCallback: boolean) => {

@@ -210,7 +210,7 @@ export function getConnectorStatus(connector: Connector, apiKeys: Array<{ name?:
 
   if (connector.statusKind === "api-key" || connector.statusKind === "oauth") {
     return apiKeys.length > 0
-      ? { label: "Ready", connected: true, detail: "Use an existing API key" }
+      ? { label: "Ready", connected: false, detail: "Use an existing API key" }
       : { label: "Not connected", connected: false, detail: "Create an API key first" };
   }
 
