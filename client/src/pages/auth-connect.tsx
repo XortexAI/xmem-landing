@@ -65,9 +65,10 @@ function appendConnectionParams(callback: string, params: Record<string, string>
 
 export default function AuthConnect() {
   const { isAuthenticated, user, token, hasUsername } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [newKey, setNewKey] = useState<NewKeyData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [autoConnecting, setAutoConnecting] = useState(false);
@@ -75,8 +76,8 @@ export default function AuthConnect() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const connector = useMemo(() => getConnector(getConnectorIdFromUrl()), []);
-  const callbackUrl = useMemo(() => getCallbackUrl(), []);
+  const connector = useMemo(() => getConnector(getConnectorIdFromUrl()), [location]);
+  const callbackUrl = useMemo(() => getCallbackUrl(), [location]);
   const returnUrl = `${window.location.pathname}${window.location.search}`;
   const hasCallback = Boolean(callbackUrl);
   const callbackIsSafe = !callbackUrl || isSafeLocalCallback(callbackUrl);
@@ -179,6 +180,12 @@ export default function AuthConnect() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, hasUsername, hasCallback, validationError, connected, autoConnecting]);
 
+  useEffect(() => {
+    if (!expiresAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
+
   if (!isAuthenticated) {
     return <Redirect to={`/login?returnUrl=${encodeURIComponent(returnUrl)}`} />;
   }
@@ -189,7 +196,7 @@ export default function AuthConnect() {
 
   const getTimeRemaining = () => {
     if (!expiresAt) return "";
-    const diff = expiresAt.getTime() - Date.now();
+    const diff = expiresAt.getTime() - now;
     if (diff <= 0) return "Expired";
     const minutes = Math.floor(diff / 60000);
     const seconds = Math.floor((diff % 60000) / 1000);
