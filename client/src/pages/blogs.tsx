@@ -18,7 +18,7 @@ function formatDate(date: string) {
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(new Date(`${date}T00:00:00`));
 }
 
 function setMeta(name: string, content: string, property = false) {

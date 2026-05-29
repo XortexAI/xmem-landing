@@ -676,12 +676,12 @@ function slugFromLocation(location: string) {
   return parts[0] === "docs" && parts[1] ? parts[1] : "overview";
 }
 
-function CodeBlock({ code }: { code: string }) {
+function CodeBlock({ code, copyCode = code }: { code: string; copyCode?: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(copyCode);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -909,7 +909,10 @@ export default function DocsPage() {
               <div className="mb-3 text-sm font-semibold text-white">
                 Active API header
               </div>
-              <CodeBlock code={`Authorization: Bearer ${token.substring(0, 24)}...`} />
+              <CodeBlock
+                code={`Authorization: Bearer ${token.substring(0, 24)}...`}
+                copyCode={`Authorization: Bearer ${token}`}
+              />
             </div>
           )}
 
