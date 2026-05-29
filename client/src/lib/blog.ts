@@ -17,8 +17,9 @@ const modules = import.meta.glob<string>("/src/content/blog/*.md", {
 });
 
 function parseFrontmatter(raw: string) {
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) return { data: {} as Record<string, string>, body: raw };
+  const normalised = raw.replace(/\r\n/g, "\n");
+  const match = normalised.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) return { data: {} as Record<string, string>, body: normalised };
 
   const data: Record<string, string> = {};
   for (const line of match[1].split("\n")) {
@@ -50,7 +51,7 @@ export const blogPosts: BlogPost[] = Object.entries(modules)
       slug: data.slug || slugFromPath(path),
       title: data.title || "Untitled",
       description: data.description || "",
-      date: data.date || "2026-05-29",
+      date: data.date || new Date().toISOString().slice(0, 10),
       author: data.author || "XMem Team",
       tags,
       readingTime: data.readingTime || readTime(body),

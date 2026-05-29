@@ -46,7 +46,7 @@ function useBlogSeo(slug: string) {
     setMeta("description", description);
     setMeta("og:title", title, true);
     setMeta("og:description", description, true);
-    setMeta("og:type", "article", true);
+    setMeta("og:type", post ? "article" : "website", true);
     setMeta("twitter:title", title);
     setMeta("twitter:description", description);
   }, [slug]);

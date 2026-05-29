@@ -174,8 +174,8 @@ export function MarkdownContent({ markdown }: { markdown: string }) {
           const ListTag = block.ordered ? "ol" : "ul";
           return (
             <ListTag key={`${block.items.join("-")}-${index}`} className="space-y-3 text-white/64">
-              {block.items.map((item) => (
-                <li key={item} className={`ml-5 leading-7 ${block.ordered ? "list-decimal" : "list-disc"}`}>
+              {block.items.map((item, itemIndex) => (
+                <li key={`${item}-${itemIndex}`} className={`ml-5 leading-7 ${block.ordered ? "list-decimal" : "list-disc"}`}>
                   {renderInline(item)}
                 </li>
               ))}
