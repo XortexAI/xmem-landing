@@ -140,7 +140,8 @@ export default function AuthConnect() {
       setNewKey(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect. Please try again.");
-      setAutoConnecting(false);
+      // Keep autoConnecting true so the effect guard blocks further retries.
+      // The user must manually retry after seeing the error.
     } finally {
       setIsLoading(false);
     }
