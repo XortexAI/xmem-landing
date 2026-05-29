@@ -743,8 +743,8 @@ function SectionBlock({ section }: { section: DocSection }) {
       {section.body && <p className="mt-4 max-w-3xl text-base leading-8 text-white/58">{section.body}</p>}
       {section.bullets && (
         <div className="mt-5 grid gap-3">
-          {section.bullets.map((item) => (
-            <div key={item} className="flex gap-3 rounded-md border border-white/10 bg-white/[0.025] p-4">
+          {section.bullets.map((item, index) => (
+            <div key={`${item}-${index}`} className="flex gap-3 rounded-md border border-white/10 bg-white/[0.025] p-4">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#b8ff65]/80" />
               <p className="text-sm leading-6 text-white/62">{item}</p>
             </div>

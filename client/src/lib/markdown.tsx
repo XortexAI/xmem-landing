@@ -123,7 +123,7 @@ function parseMarkdown(markdown: string): Block[] {
       index < lines.length &&
       lines[index].trim() &&
       !lines[index].startsWith("```") &&
-      !/^#{2,3}\s+/.test(lines[index]) &&
+      !/^#{1,3}\s+/.test(lines[index]) &&
       !/^!\[/.test(lines[index]) &&
       !/^[-*]\s+/.test(lines[index]) &&
       !/^\d+\.\s+/.test(lines[index]) &&

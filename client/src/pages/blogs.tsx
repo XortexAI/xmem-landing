@@ -34,6 +34,11 @@ function setMeta(name: string, content: string, property = false) {
   tag.content = content;
 }
 
+function removeMeta(name: string, property = false) {
+  const selector = property ? `meta[property="${name}"]` : `meta[name="${name}"]`;
+  document.head.querySelector<HTMLMetaElement>(selector)?.remove();
+}
+
 function absoluteUrl(path: string) {
   return new URL(path, window.location.origin).href;
 }
@@ -58,6 +63,10 @@ function useBlogSeo(slug: string) {
       setMeta("og:image", image, true);
       setMeta("twitter:image", image);
       setMeta("twitter:card", "summary_large_image");
+    } else {
+      removeMeta("og:image", true);
+      removeMeta("twitter:image");
+      removeMeta("twitter:card");
     }
   }, [slug]);
 }
