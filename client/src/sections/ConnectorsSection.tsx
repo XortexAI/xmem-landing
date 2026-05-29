@@ -1,125 +1,123 @@
 import { motion } from "framer-motion";
-import { Code2, Terminal, Puzzle, BookOpen, ArrowRight } from "lucide-react";
+import { ArrowRight, BookOpen, Search } from "lucide-react";
 import { Link } from "wouter";
+import { connectors, type ConnectorGroup } from "@/lib/connectors";
 import { RevealSection } from "../components/shared/RevealSection";
 
-const connectors = [
-  {
-    id: "opencode",
-    icon: Code2,
-    title: "OpenCode",
-    description: "Persistent memory for OpenCode coding agents. Auto-recall, keyword detection, and session compaction.",
-    href: "/docs#opencode",
-    cta: "Install plugin",
-    accent: "from-emerald-500/20 to-cyan-500/20",
-    iconColor: "text-emerald-400",
-  },
-  {
-    id: "mcp",
-    icon: Terminal,
-    title: "MCP Server",
-    description: "Connect Claude Desktop, ChatGPT, and other MCP clients to your XMem memory.",
-    href: "/auth/mcp",
-    cta: "Connect MCP",
-    accent: "from-blue-500/20 to-purple-500/20",
-    iconColor: "text-blue-400",
-  },
-  {
-    id: "extension",
-    icon: Puzzle,
-    title: "Chrome Extension",
-    description: "Inline memory suggestions and auto-save across ChatGPT, Claude, Gemini, and more.",
-    href: "/docs#extension",
-    cta: "Get extension",
-    accent: "from-orange-500/20 to-pink-500/20",
-    iconColor: "text-orange-400",
-  },
-  {
-    id: "sdk",
-    icon: BookOpen,
-    title: "SDK & API",
-    description: "TypeScript, Python SDKs, and REST API for building memory into your own agents.",
-    href: "/docs#api",
-    cta: "View docs",
-    accent: "from-violet-500/20 to-indigo-500/20",
-    iconColor: "text-violet-400",
-  },
-];
+const groups: ConnectorGroup[] = ["MCP", "Plugins", "Knowledge bases", "Apps & extensions", "Developer"];
 
 export function ConnectorsSection() {
-  return (
-    <section
-      className="relative py-40 overflow-hidden"
-      style={{ background: "#080808" }}
-    >
-      <div className="absolute inset-0 dot-pattern opacity-20" />
+  const counts = groups.map((group) => ({
+    group,
+    count: connectors.filter((connector) => connector.group === group).length,
+  }));
 
-      <div className="max-w-7xl mx-auto px-6 relative">
-        <RevealSection className="text-center mb-16">
-          <div
-            className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs text-white/50 uppercase tracking-widest"
-            style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-          >
-            Integrations
+  return (
+    <section className="relative overflow-hidden bg-[#080808] py-28">
+      <div className="absolute inset-0 dot-pattern opacity-15" />
+
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <RevealSection className="mb-6 overflow-hidden rounded-lg border border-white/10 bg-[#15181f]">
+          <div className="grid min-h-[180px] gap-6 overflow-hidden md:grid-cols-[1fr_420px]">
+            <div className="flex flex-col justify-center px-7 py-8">
+              <div className="mb-5 w-fit rounded-md bg-cyan-300 px-3 py-1 text-xs font-bold uppercase tracking-normal text-black">
+                Featured
+              </div>
+              <h2 className="text-2xl font-bold text-white md:text-3xl">
+                Your AI tools remember the work between sessions.
+              </h2>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/55 md:text-base">
+                Connect XMem to coding agents, MCP clients, knowledge bases, and workspace apps from one dashboard.
+              </p>
+            </div>
+            <div className="relative hidden items-center justify-center overflow-hidden bg-[#111827] md:flex">
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(34,211,238,0.20),rgba(16,185,129,0.12),rgba(99,102,241,0.14))]" />
+              <div className="relative text-[7rem] font-black leading-none text-cyan-200/25 lg:text-[9rem]">
+                MCP
+              </div>
+            </div>
           </div>
-          <h2
-            className="text-4xl md:text-5xl font-bold mb-6"
-            style={{ color: "#fafafa" }}
-          >
-            Connect XMem Everywhere
-          </h2>
-          <p className="text-lg text-white/45 max-w-2xl mx-auto">
-            Plug persistent memory into your coding agents, chat tools, and custom applications.
-          </p>
         </RevealSection>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {connectors.map((connector, index) => (
-            <motion.div
-              key={connector.id}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.08, duration: 0.5 }}
-            >
-              <Link href={connector.href}>
-                <div
-                  className="group h-full rounded-xl p-6 cursor-pointer transition-all duration-300 hover:border-white/20"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                  }}
+        <RevealSection className="rounded-lg border border-white/10 bg-[#171a21] p-5 shadow-2xl shadow-black/25">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex max-w-full gap-2 overflow-x-auto rounded-full bg-black/25 p-1">
+              <Link href="/auth/connect" className="shrink-0 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white">
+                All
+              </Link>
+              {counts.map(({ group, count }) => (
+                <a
+                  key={group}
+                  href={`#connector-group-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                  className="shrink-0 rounded-full px-4 py-2 text-sm text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white"
                 >
-                  <div
-                    className={`inline-flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-br ${connector.accent} mb-5`}
-                  >
-                    <connector.icon className={`h-6 w-6 ${connector.iconColor}`} />
+                  {group} <span className="ml-1 text-white/35">{count}</span>
+                </a>
+              ))}
+            </div>
+            <Link
+              href="/dashboard"
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-black/25 px-4 py-2 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white"
+            >
+              <Search className="h-4 w-4" />
+              Dashboard
+            </Link>
+          </div>
+
+          <div className="space-y-8">
+            {groups.map((group) => {
+              const groupConnectors = connectors.filter((connector) => connector.group === group);
+              if (groupConnectors.length === 0) return null;
+
+              return (
+                <div key={group} id={`connector-group-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="scroll-mt-28">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-normal text-white/55">{group}</h3>
+                    <div className="h-px flex-1 bg-white/10" />
                   </div>
 
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    {connector.title}
-                  </h3>
-                  <p className="text-sm text-white/45 leading-relaxed mb-5">
-                    {connector.description}
-                  </p>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {groupConnectors.map((connector, index) => {
+                      const Icon = connector.icon;
+                      return (
+                        <motion.div
+                          key={connector.id}
+                          initial={{ opacity: 0, y: 18 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.04, duration: 0.35 }}
+                          className="rounded-lg border border-white/[0.07] bg-[#121419] p-5 transition-colors hover:border-white/20"
+                        >
+                          <div className="mb-5 flex items-start justify-between gap-3">
+                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <Link href={`/docs#connector-${connector.id}`} className="inline-flex items-center gap-1 text-xs text-white/45 hover:text-white">
+                              <BookOpen className="h-3.5 w-3.5" />
+                              Docs
+                            </Link>
+                          </div>
 
-                  <div className="flex items-center gap-2 text-sm text-white/60 group-hover:text-white transition-colors">
-                    {connector.cta}
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                          <div className="flex min-h-[88px] flex-col">
+                            <h4 className="text-base font-semibold text-white">{connector.name}</h4>
+                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/45">{connector.description}</p>
+                          </div>
+
+                          <Link
+                            href={connector.connectPath}
+                            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.08]"
+                          >
+                            Connect
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </div>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-
-        <RevealSection className="mt-12 text-center">
-          <p className="text-sm text-white/35">
-            OpenCode users can also{" "}
-            <Link href="/auth/connect?client=opencode" className="text-emerald-400/80 hover:text-emerald-400 underline underline-offset-2">
-              re-authenticate manually
-            </Link>
-          </p>
+              );
+            })}
+          </div>
         </RevealSection>
       </div>
     </section>

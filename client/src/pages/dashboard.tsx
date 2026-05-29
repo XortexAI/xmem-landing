@@ -27,6 +27,8 @@ import {
 import {
   AlertCircle,
   ArrowUpRight,
+  BookOpen,
+  Cable,
   Check,
   Copy,
   Edit2,
@@ -41,6 +43,8 @@ import { Navbar } from "@/sections/Navbar";
 import { Footer } from "@/sections/Footer";
 import { useMemoryGraph, type MemoryNode } from "@/hooks/useMemoryGraph";
 import { MemoryDetails } from "@/components/MemoryDetails";
+import { connectors, getConnectorStatus } from "@/lib/connectors";
+import { useLocation } from "wouter";
 import {
   loadRazorpayCheckout,
   type RazorpayOrder,
@@ -197,7 +201,7 @@ export default function Dashboard() {
   const [isBillingLoading, setIsBillingLoading] = useState(true);
   const [billingWarning, setBillingWarning] = useState<string | null>(null);
   const [billingPackageId, setBillingPackageId] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"overview" | "api-keys" | "memories" | "billing">("overview");
+  const [activeSection, setActiveSection] = useState<DashboardSection>("overview");
 
   const {
     data: memoryData,
@@ -612,6 +616,7 @@ export default function Dashboard() {
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
                     {activeSection === "overview" && "Review your account, usage, and current XMem activity."}
                     {activeSection === "api-keys" && "Create and manage credentials for your applications."}
+                    {activeSection === "connectors" && "Connect XMem to agents, MCP clients, browsers, and custom tools."}
                     {activeSection === "memories" && "Inspect the memories and context stored in your account."}
                     {activeSection === "billing" && "Choose a plan and manage payment access."}
                   </p>
@@ -707,6 +712,10 @@ export default function Dashboard() {
                     </Card>
                   </div>
                 </div>
+              )}
+
+              {activeSection === "connectors" && (
+                <ConnectorsPanel apiKeys={apiKeys} isLoading={isLoading} />
               )}
 
               {activeSection === "api-keys" && (
@@ -966,7 +975,7 @@ function MetricCard({
   );
 }
 
-type DashboardSection = "overview" | "api-keys" | "memories" | "billing";
+type DashboardSection = "overview" | "api-keys" | "connectors" | "memories" | "billing";
 
 const dashboardNavItems: Array<{
   id: DashboardSection;
@@ -975,6 +984,7 @@ const dashboardNavItems: Array<{
 }> = [
   { id: "overview", label: "Overview", description: "Account and usage" },
   { id: "api-keys", label: "API keys", description: "Access credentials" },
+  { id: "connectors", label: "Connectors", description: "Apps and agents" },
   { id: "memories", label: "Memories", description: "Stored context" },
   { id: "billing", label: "Billing", description: "Credits and payments" },
 ];
@@ -997,6 +1007,7 @@ function DashboardSidebar({
   const metaBySection: Record<DashboardSection, string> = {
     overview: "Live",
     "api-keys": `${activeApiKeys} active`,
+    connectors: `${connectors.length} available`,
     memories: formatNumber(memoryCount),
     billing: `${formatNumber(creditBalance)} credits`,
   };
@@ -1098,6 +1109,99 @@ function UsageItem({ label, value }: { label: string; value: number }) {
     <div className="rounded-lg border border-white/10 bg-[#0a0a0a] p-4">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="mt-1 font-mono text-lg text-white">{new Intl.NumberFormat("en-IN").format(value)}</p>
+    </div>
+  );
+}
+
+function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading: boolean }) {
+  const [, setLocation] = useLocation();
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0d0d0d] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-gray-400">
+            <Cable className="h-3.5 w-3.5" />
+            Connector status
+          </div>
+          <h2 className="text-xl font-semibold text-white">Connect XMem everywhere</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
+            See which agents and clients are connected, then open the right setup flow or docs.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="h-9 w-full border-white/10 bg-transparent text-gray-300 hover:bg-white/[0.06] hover:text-white sm:w-auto"
+          onClick={() => {
+            window.location.href = "/docs#connectors";
+          }}
+        >
+          <BookOpen className="mr-2 h-4 w-4" />
+          Docs
+        </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {connectors.map((connector) => {
+          const status = getConnectorStatus(connector, apiKeys);
+          const ConnectorIcon = connector.icon;
+
+          return (
+            <Card key={connector.id} className="border-white/10 bg-[#0d0d0d]">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
+                      <ConnectorIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-sm font-semibold text-white">{connector.name}</h3>
+                        <Badge className="border-white/10 bg-white/[0.05] text-gray-400">{connector.category}</Badge>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-400">{connector.description}</p>
+                    </div>
+                  </div>
+                  <Badge
+                    className={
+                      status.connected
+                        ? "border-green-800 bg-green-900/30 text-green-300"
+                        : "border-yellow-800 bg-yellow-900/30 text-yellow-200"
+                    }
+                  >
+                    {isLoading ? "Checking" : status.label}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+                  <span className="min-w-0 truncate text-xs text-gray-500">{isLoading ? "Loading API keys" : status.detail}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-white"
+                      onClick={() => {
+                        window.location.href = `/docs#connector-${connector.id}`;
+                      }}
+                    >
+                      Docs
+                    </Button>
+                      <Button
+                        size="sm"
+                        className="bg-white text-black hover:bg-gray-200"
+                        onClick={() => {
+                          setLocation(connector.connectPath);
+                        }}
+                      >
+                      Connect
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
