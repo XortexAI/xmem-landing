@@ -1,27 +1,36 @@
 import type { ComponentType } from "react";
 import {
   Bot,
+  Boxes,
   Code2,
+  Database,
+  Flame,
   KeyRound,
+  MousePointer2,
   Network,
   Puzzle,
+  Sparkles,
   Terminal,
 } from "lucide-react";
 import {
   SiClaude,
   SiGithub,
   SiGithubcopilot,
+  SiGoogledrive,
   SiGooglechrome,
+  SiNotion,
   SiOpenai,
 } from "react-icons/si";
 
 export type ConnectorStatusKind = "oauth" | "api-key" | "mcp-token";
+export type ConnectorGroup = "MCP" | "Plugins" | "Knowledge bases" | "Apps & extensions" | "Developer";
 
 export interface Connector {
   id: string;
   name: string;
   shortName: string;
   category: string;
+  group: ConnectorGroup;
   statusKind: ConnectorStatusKind;
   description: string;
   docs: string[];
@@ -37,6 +46,7 @@ export const connectors: Connector[] = [
     name: "OpenCode",
     shortName: "OpenCode",
     category: "Coding agent",
+    group: "Plugins",
     statusKind: "oauth",
     description: "Install the XMem OpenCode plugin and connect it with browser auth.",
     connectPath: "/auth/connect/opencode",
@@ -51,10 +61,106 @@ export const connectors: Connector[] = [
     ],
   },
   {
+    id: "claude-code",
+    name: "Claude Code",
+    shortName: "Claude Code",
+    category: "Coding agent",
+    group: "Plugins",
+    statusKind: "api-key",
+    description: "Add XMem slash commands, MCP config, and persistent coding memory to Claude Code.",
+    connectPath: "/auth/connect/claude-code",
+    accent: "from-amber-300 to-orange-200",
+    icon: SiClaude,
+    installCommand: "npx xmem-claude-code@latest install",
+    docs: [
+      "Run the connector installer from the project or home directory you want Claude Code to use.",
+      "Keep XMEM_API_KEY and XMEM_USERNAME in your environment or secret store.",
+      "Restart Claude Code so the XMem MCP server and slash commands are loaded.",
+      "Use XMem memory tools when you need prior project or user context.",
+    ],
+  },
+  {
+    id: "cursor",
+    name: "Cursor",
+    shortName: "Cursor",
+    category: "IDE",
+    group: "MCP",
+    statusKind: "mcp-token",
+    description: "Install XMem MCP config and Cursor rules for project memory inside Cursor.",
+    connectPath: "/auth/connect/cursor",
+    accent: "from-sky-300 to-blue-200",
+    icon: MousePointer2,
+    installCommand: "npx xmem-cursor@latest install",
+    docs: [
+      "Run the connector installer in a workspace or pass --config-root for a specific project.",
+      "Set XMEM_API_KEY and XMEM_USERNAME in the Cursor MCP launch environment.",
+      "Open Cursor settings and confirm the xmem MCP server is available.",
+      "Use XMem tools for memory search, recall, and durable project notes.",
+    ],
+  },
+  {
+    id: "hermes",
+    name: "Hermes",
+    shortName: "Hermes",
+    category: "Coding agent",
+    group: "Plugins",
+    statusKind: "api-key",
+    description: "Configure Hermes Agent with XMem MCP memory and shared agent instructions.",
+    connectPath: "/auth/connect/hermes",
+    accent: "from-rose-300 to-pink-200",
+    icon: Sparkles,
+    installCommand: "npx xmem-hermes@latest install",
+    docs: [
+      "Run the Hermes connector installer to create local MCP config and HERMES.md guidance.",
+      "Keep XMEM_API_KEY out of the generated files and provide it through the environment.",
+      "Restart Hermes after installing the connector config.",
+      "Use XMem for persistent memory across Hermes sessions.",
+    ],
+  },
+  {
+    id: "codex",
+    name: "Codex",
+    shortName: "Codex",
+    category: "Coding agent",
+    group: "Plugins",
+    statusKind: "api-key",
+    description: "Install XMem as a Codex plugin plus MCP-backed project memory instructions.",
+    connectPath: "/auth/connect/codex",
+    accent: "from-indigo-300 to-cyan-200",
+    icon: Bot,
+    installCommand: "npx xmem-codex@latest install",
+    docs: [
+      "Run the Codex connector installer to create config.toml and AGENTS.md memory guidance.",
+      "Install the included Codex plugin bundle when you want Codex app discoverability.",
+      "Set XMEM_API_KEY and XMEM_USERNAME in the runtime environment.",
+      "Use XMem tools for durable user and project memory.",
+    ],
+  },
+  {
+    id: "openclaw",
+    name: "OpenClaw",
+    shortName: "OpenClaw",
+    category: "Coding agent",
+    group: "Plugins",
+    statusKind: "api-key",
+    description: "Connect OpenClaw to XMem with an MCP plugin bundle and memory skill.",
+    connectPath: "/auth/connect/openclaw",
+    accent: "from-red-300 to-orange-200",
+    icon: Flame,
+    installCommand: "npx xmem-openclaw@latest install",
+    docs: [
+      "Run the OpenClaw connector installer to generate plugin and MCP files.",
+      "Provide XMEM_API_KEY and XMEM_USERNAME from the environment.",
+      "Install or reload the OpenClaw plugin bundle.",
+      "Use the XMem memory skill for cross-session recall.",
+    ],
+  },
+  {
     id: "mcp",
     name: "MCP Server",
     shortName: "MCP",
     category: "Protocol",
+    group: "MCP",
     statusKind: "mcp-token",
     description: "Generate a temporary token for MCP-compatible clients.",
     connectPath: "/auth/connect/mcp",
@@ -72,6 +178,7 @@ export const connectors: Connector[] = [
     name: "Claude Desktop",
     shortName: "Claude",
     category: "MCP client",
+    group: "MCP",
     statusKind: "mcp-token",
     description: "Connect Claude Desktop through the XMem MCP server.",
     connectPath: "/auth/connect/claude",
@@ -89,6 +196,7 @@ export const connectors: Connector[] = [
     name: "ChatGPT",
     shortName: "ChatGPT",
     category: "MCP client",
+    group: "MCP",
     statusKind: "mcp-token",
     description: "Use XMem memory from ChatGPT through an MCP connector.",
     connectPath: "/auth/connect/chatgpt",
@@ -106,6 +214,7 @@ export const connectors: Connector[] = [
     name: "Chrome Extension",
     shortName: "Chrome",
     category: "Browser",
+    group: "Apps & extensions",
     statusKind: "api-key",
     description: "Use XMem inline memory inside AI chat websites.",
     connectPath: "/auth/connect/chrome",
@@ -123,6 +232,7 @@ export const connectors: Connector[] = [
     name: "GitHub Copilot",
     shortName: "Copilot",
     category: "IDE assistant",
+    group: "MCP",
     statusKind: "mcp-token",
     description: "Prepare XMem memory for Copilot-compatible MCP workflows.",
     connectPath: "/auth/connect/copilot",
@@ -140,6 +250,7 @@ export const connectors: Connector[] = [
     name: "GitHub Scanner",
     shortName: "GitHub",
     category: "Code memory",
+    group: "Knowledge bases",
     statusKind: "api-key",
     description: "Index repositories into XMem code memory and query them later.",
     connectPath: "/auth/connect/github",
@@ -153,10 +264,47 @@ export const connectors: Connector[] = [
     ],
   },
   {
+    id: "notion",
+    name: "Notion",
+    shortName: "Notion",
+    category: "Knowledge base",
+    group: "Knowledge bases",
+    statusKind: "oauth",
+    description: "Sync selected Notion pages and workspace notes into XMem memory.",
+    connectPath: "/auth/connect/notion",
+    accent: "from-white to-zinc-300",
+    icon: SiNotion,
+    docs: [
+      "Open the Notion connector page and start OAuth.",
+      "Choose the workspace and pages XMem can access.",
+      "Review imported page memory from the dashboard.",
+      "Disconnect or rotate access from connector settings when needed.",
+    ],
+  },
+  {
+    id: "google-drive",
+    name: "Google Drive",
+    shortName: "Drive",
+    category: "Knowledge base",
+    group: "Knowledge bases",
+    statusKind: "oauth",
+    description: "Bring Google Drive docs and files into XMem as searchable memory.",
+    connectPath: "/auth/connect/google-drive",
+    accent: "from-emerald-300 to-yellow-200",
+    icon: SiGoogledrive,
+    docs: [
+      "Open the Google Drive connector page and start OAuth.",
+      "Grant read access only to the files or folders you want indexed.",
+      "Let XMem ingest supported docs into memory.",
+      "Manage sync state from the connector dashboard.",
+    ],
+  },
+  {
     id: "api",
     name: "XMem API",
     shortName: "API",
     category: "Developer",
+    group: "Developer",
     statusKind: "api-key",
     description: "Use direct REST, Python, or TypeScript SDK access.",
     connectPath: "/auth/connect/api",
@@ -174,6 +322,7 @@ export const connectors: Connector[] = [
     name: "Custom Connector",
     shortName: "Custom",
     category: "SDK",
+    group: "Developer",
     statusKind: "api-key",
     description: "Bring XMem into an internal agent, plugin, or workflow.",
     connectPath: "/auth/connect/custom",
@@ -221,4 +370,4 @@ export function connectorLogoLabel(connector: Connector) {
   return `${connector.name} logo`;
 }
 
-export { Bot, Puzzle };
+export { Bot, Boxes, Database, Puzzle };
