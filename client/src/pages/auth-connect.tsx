@@ -72,6 +72,7 @@ export default function AuthConnect() {
   const [newKey, setNewKey] = useState<NewKeyData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [autoConnecting, setAutoConnecting] = useState(false);
+  const [autoConnectFailed, setAutoConnectFailed] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -105,7 +106,10 @@ export default function AuthConnect() {
     if (validationError) return;
 
     setIsLoading(true);
-    if (redirectToCallback) setAutoConnecting(true);
+    if (redirectToCallback) {
+      setAutoConnecting(true);
+      setAutoConnectFailed(false);
+    }
     setError(null);
 
     try {
@@ -140,8 +144,10 @@ export default function AuthConnect() {
       setNewKey(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect. Please try again.");
-      // Keep autoConnecting true so the effect guard blocks further retries.
-      // The user must manually retry after seeing the error.
+      if (redirectToCallback) {
+        setAutoConnectFailed(true);
+        setAutoConnecting(false);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -176,10 +182,10 @@ export default function AuthConnect() {
   };
 
   useEffect(() => {
-    if (!isAuthenticated || !hasUsername || !hasCallback || validationError || connected || autoConnecting) return;
+    if (!isAuthenticated || !hasUsername || !hasCallback || validationError || connected || autoConnecting || autoConnectFailed) return;
     void createConnectorKey(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, hasUsername, hasCallback, validationError, connected, autoConnecting]);
+  }, [isAuthenticated, hasUsername, hasCallback, validationError, connected, autoConnecting, autoConnectFailed]);
 
   useEffect(() => {
     if (!expiresAt) return;

@@ -344,14 +344,25 @@ export function getConnector(id?: string | null): Connector {
   return connectors.find((connector) => connector.id === id) ?? defaultConnector;
 }
 
+function normalizeKeyName(name?: string) {
+  return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function keyNameMatchesConnector(name: string, connector: Connector) {
+  const candidates = [connector.id, connector.name, connector.shortName]
+    .map((value) => value.toLowerCase())
+    .filter(Boolean);
+
+  if (candidates.some((candidate) => name === candidate || name.startsWith(`${candidate} connector`))) {
+    return true;
+  }
+
+  return connector.id === "mcp" && name.startsWith("mcp client");
+}
+
 export function getConnectorStatus(connector: Connector, apiKeys: Array<{ name?: string }>) {
-  const normalizedNames = apiKeys.map((key) => (key.name || "").toLowerCase());
-  const hasNamedKey = normalizedNames.some((name) => {
-    if (name.includes(connector.id)) return true;
-    if (name.includes(connector.shortName.toLowerCase())) return true;
-    if (connector.statusKind === "mcp-token" && name.includes("mcp client")) return true;
-    return false;
-  });
+  const normalizedNames = apiKeys.map((key) => normalizeKeyName(key.name));
+  const hasNamedKey = normalizedNames.some((name) => keyNameMatchesConnector(name, connector));
 
   if (hasNamedKey) {
     return { label: "Connected", connected: true, detail: "Connector key found" };
