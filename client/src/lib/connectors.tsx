@@ -361,15 +361,16 @@ function keyNameMatchesConnector(name: string, connector: Connector) {
 }
 
 export function getConnectorStatus(connector: Connector, apiKeys: Array<{ name?: string }>) {
-  if (connector.statusKind === "oauth") {
-    return { label: "Not connected", connected: false, detail: "OAuth authorization required" };
-  }
-
   const normalizedNames = apiKeys.map((key) => normalizeKeyName(key.name));
-  const hasNamedKey = normalizedNames.some((name) => keyNameMatchesConnector(name, connector));
+  const shouldDetectKey = connector.statusKind !== "oauth" || connector.id === "opencode";
+  const hasNamedKey = shouldDetectKey && normalizedNames.some((name) => keyNameMatchesConnector(name, connector));
 
   if (hasNamedKey) {
     return { label: "Connected", connected: true, detail: "Connector key found" };
+  }
+
+  if (connector.statusKind === "oauth") {
+    return { label: "Not connected", connected: false, detail: "OAuth authorization required" };
   }
 
   if (connector.statusKind === "api-key") {

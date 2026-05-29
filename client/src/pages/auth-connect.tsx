@@ -90,6 +90,19 @@ export default function AuthConnect() {
         : null;
   const Icon = connector.icon;
 
+  useEffect(() => {
+    setTempToken(null);
+    setExpiresAt(null);
+    setNow(Date.now());
+    setNewKey(null);
+    setIsLoading(false);
+    setAutoConnecting(false);
+    setAutoConnectFailed(false);
+    setConnected(false);
+    setError(null);
+    setCopied(null);
+  }, [connector.id]);
+
   const flashCopied = (value: string) => {
     setCopied(value);
     setTimeout(() => setCopied(null), 1800);
