@@ -14,6 +14,7 @@ import Dashboard from "@/pages/dashboard";
 import SetUsername from "@/pages/set-username";
 import DocsPage from "@/pages/docs";
 import Enterprise from "@/pages/enterprise";
+import AuthMcp from "@/pages/auth-mcp";
 import AuthConnect from "@/pages/auth-connect";
 import OAuthAuthorize from "@/pages/oauth-authorize";
 import Privacy from "@/pages/privacy";
@@ -61,9 +62,9 @@ function Router() {
         <SeoPage title="Architecture" description="Deep dive into XMem's judge-before-write architecture and storage backends." />
       </Route>
       <Route path="/privacy" component={Privacy} />
+      <Route path="/auth/mcp" component={AuthMcp} />
       <Route path="/auth/connect" component={AuthConnect} />
       <Route path="/auth/connect/:connector" component={AuthConnect} />
-      <Route path="/auth/mcp" component={AuthConnect} />
       <Route path="/oauth/authorize" component={OAuthAuthorize} />
       <Route path="/memory-layer-for-ai-agents">
         <SeoPage title="Memory Layer for AI Agents" description="Learn how XMem acts as a persistent memory layer for AI agents, enabling long-term context and recall." />

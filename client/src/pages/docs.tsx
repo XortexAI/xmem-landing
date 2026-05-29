@@ -17,6 +17,7 @@ import {
   ScanSearch,
   Server,
   Terminal,
+  Code2,
 } from "lucide-react";
 
 const extensionDemoUrl =
@@ -257,6 +258,39 @@ uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8000`}
           </div>
         </section>
 
+        <section id="opencode" className="mb-16 scroll-mt-28">
+          <div className="mb-6 flex items-center gap-3">
+            <Code2 className="h-5 w-5 text-white/65" />
+            <h2 className="text-2xl font-semibold">OpenCode Plugin</h2>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.03] p-6">
+            <p className="text-sm leading-relaxed text-white/55">
+              The opencode-xmem plugin gives OpenCode coding agents persistent memory across sessions.
+              It auto-recalls relevant context, detects &quot;remember this&quot; requests, and saves session summaries before context overflow.
+            </p>
+            <div className="mt-5 space-y-3">
+              <pre className="overflow-x-auto rounded-md border border-white/10 bg-black/40 p-4 text-sm text-emerald-300/90">
+{`bunx opencode-xmem@latest install
+bunx opencode-xmem@latest login`}
+              </pre>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/auth/connect?client=opencode" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-black">
+                Connect OpenCode
+                <Code2 className="h-4 w-4" />
+              </Link>
+              <a
+                href="https://www.npmjs.com/package/opencode-xmem"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/75 hover:bg-white/[0.08]"
+              >
+                npm package
+              </a>
+            </div>
+          </div>
+        </section>
+
         <section id="connectors" className="mb-16 scroll-mt-28">
           <div className="mb-6 flex items-center gap-3">
             <Puzzle className="h-5 w-5 text-white/65" />
@@ -264,7 +298,7 @@ uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8000`}
           </div>
           <div className="mb-5 rounded-md border border-white/10 bg-white/[0.03] p-6">
             <p className="text-sm leading-relaxed text-white/55">
-              XMem can connect through direct API keys, temporary MCP tokens, and browser-based connector authorization flows. Use the dashboard to see connector status and start the right setup path.
+              XMem connects through direct API keys, temporary MCP tokens, and browser-based local authorization flows. Use the dashboard to see connector status and start the correct setup path.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/dashboard" className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-black">
@@ -286,12 +320,12 @@ uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8000`}
                   className="scroll-mt-28 rounded-md border border-white/10 bg-white/[0.03] p-5"
                 >
                   <div className="mb-4 flex items-start gap-4">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gradient-to-br ${connector.accent} text-black`}>
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
                       <ConnectorIcon className="h-6 w-6" />
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-white">{connector.name}</div>
-                      <p className="mt-1 text-xs uppercase tracking-wide text-white/35">{connector.category}</p>
+                      <p className="mt-1 text-xs uppercase tracking-normal text-white/35">{connector.category}</p>
                     </div>
                   </div>
                   <p className="mb-4 text-sm leading-relaxed text-white/50">{connector.description}</p>
