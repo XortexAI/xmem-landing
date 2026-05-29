@@ -4,3 +4,6 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.npm-cache/
+vite*.log
+docs/pr-screenshots/
