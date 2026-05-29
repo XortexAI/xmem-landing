@@ -34,6 +34,10 @@ function setMeta(name: string, content: string, property = false) {
   tag.content = content;
 }
 
+function absoluteUrl(path: string) {
+  return new URL(path, window.location.origin).href;
+}
+
 function useBlogSeo(slug: string) {
   useEffect(() => {
     const post = slug ? getBlogPost(slug) : null;
@@ -49,6 +53,12 @@ function useBlogSeo(slug: string) {
     setMeta("og:type", post ? "article" : "website", true);
     setMeta("twitter:title", title);
     setMeta("twitter:description", description);
+    if (post?.heroImage) {
+      const image = absoluteUrl(post.heroImage);
+      setMeta("og:image", image, true);
+      setMeta("twitter:image", image);
+      setMeta("twitter:card", "summary_large_image");
+    }
   }, [slug]);
 }
 

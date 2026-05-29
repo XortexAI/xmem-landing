@@ -845,20 +845,22 @@ export default function DocsPage() {
               {page.title}
             </h1>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-white/58">{page.description}</p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                href="/docs/quickstart"
-                className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#b8ff65]"
-              >
-                Quickstart
-              </Link>
-              <Link
-                href="/docs/agent-connectors"
-                className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/72 transition hover:bg-white/[0.08] hover:text-white"
-              >
-                Connect an agent
-              </Link>
-            </div>
+            {page.slug === "overview" && (
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link
+                  href="/docs/quickstart"
+                  className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#b8ff65]"
+                >
+                  Quickstart
+                </Link>
+                <Link
+                  href="/docs/agent-connectors"
+                  className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/72 transition hover:bg-white/[0.08] hover:text-white"
+                >
+                  Connect an agent
+                </Link>
+              </div>
+            )}
             <div className="mt-6 text-sm text-white/38">Updated {page.updated}</div>
           </motion.header>
 

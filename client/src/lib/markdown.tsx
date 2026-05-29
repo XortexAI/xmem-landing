@@ -85,9 +85,11 @@ function parseMarkdown(markdown: string): Block[] {
       continue;
     }
 
-    const heading = line.match(/^(#{2,3})\s+(.+)$/);
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
     if (heading) {
-      blocks.push({ type: "heading", level: heading[1].length as 2 | 3, text: heading[2] });
+      const rawLevel = heading[1].length;
+      const level = Math.min(Math.max(rawLevel, 2), 3) as 2 | 3;
+      blocks.push({ type: "heading", level, text: heading[2] });
       index += 1;
       continue;
     }
