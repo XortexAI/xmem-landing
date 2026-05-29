@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Navbar } from "@/sections/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
+import { connectors } from "@/lib/connectors";
 import {
   BookOpen,
   CheckCircle2,
@@ -253,6 +254,69 @@ uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8000`}
                 Scanner endpoints
               </a>
             </div>
+          </div>
+        </section>
+
+        <section id="connectors" className="mb-16 scroll-mt-28">
+          <div className="mb-6 flex items-center gap-3">
+            <Puzzle className="h-5 w-5 text-white/65" />
+            <h2 className="text-2xl font-semibold">Connectors</h2>
+          </div>
+          <div className="mb-5 rounded-md border border-white/10 bg-white/[0.03] p-6">
+            <p className="text-sm leading-relaxed text-white/55">
+              XMem can connect through direct API keys, temporary MCP tokens, and browser-based connector authorization flows. Use the dashboard to see connector status and start the right setup path.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/dashboard" className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-black">
+                Open dashboard
+              </Link>
+              <Link href="/auth/connect/opencode" className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/75 hover:bg-white/[0.08]">
+                Connect OpenCode
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {connectors.map((connector) => {
+              const ConnectorIcon = connector.icon;
+              return (
+                <div
+                  key={connector.id}
+                  id={`connector-${connector.id}`}
+                  className="scroll-mt-28 rounded-md border border-white/10 bg-white/[0.03] p-5"
+                >
+                  <div className="mb-4 flex items-start gap-4">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gradient-to-br ${connector.accent} text-black`}>
+                      <ConnectorIcon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-white">{connector.name}</div>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-white/35">{connector.category}</p>
+                    </div>
+                  </div>
+                  <p className="mb-4 text-sm leading-relaxed text-white/50">{connector.description}</p>
+                  {connector.installCommand && (
+                    <pre className="mb-4 overflow-x-auto rounded-md border border-white/10 bg-black/50 p-3 text-xs text-cyan-200">
+{connector.installCommand}
+                    </pre>
+                  )}
+                  <ol className="space-y-2">
+                    {connector.docs.map((step, index) => (
+                      <li key={step} className="text-sm leading-relaxed text-white/55">
+                        <span className="mr-2 text-white/80">{index + 1}.</span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                  <Link
+                    href={connector.connectPath}
+                    className="mt-5 inline-flex rounded-md border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/75 hover:bg-white/[0.08]"
+                  >
+                    Open connect flow
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         </section>
 

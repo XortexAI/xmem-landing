@@ -38,12 +38,15 @@ import {
   EyeOff,
   Brain,
   RefreshCw,
+  BookOpen,
+  Cable,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Navbar } from '@/sections/Navbar';
 import { Footer } from '@/sections/Footer';
 import { useMemoryGraph, type MemoryNode } from '@/hooks/useMemoryGraph';
 import { MemoryDetails } from '@/components/MemoryDetails';
+import { connectors, getConnectorStatus } from '@/lib/connectors';
 
 // Lazy load the 3D component for better performance
 const MemoryBrain = lazy(() => import('@/components/three-d/MemoryBrain').then(mod => ({ default: mod.MemoryBrain })));
@@ -459,6 +462,90 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          <section className="mb-10">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-gray-800 bg-white/[0.03] px-3 py-1 text-xs font-medium text-gray-400">
+                  <Cable className="h-3.5 w-3.5" />
+                  Connectors
+                </div>
+                <h2 className="text-2xl font-semibold text-white">Connect XMem everywhere</h2>
+                <p className="mt-2 max-w-2xl text-sm text-gray-400">
+                  Track which clients are ready to use XMem and open the right setup flow for each connector.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-fit border-gray-700 text-gray-300 hover:bg-gray-800"
+                onClick={() => window.location.href = '/docs#connectors'}
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                Docs
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {connectors.map((connector) => {
+                const status = getConnectorStatus(connector, apiKeys);
+                const ConnectorIcon = connector.icon;
+
+                return (
+                  <Card key={connector.id} className="bg-[#111] border-gray-800">
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-gradient-to-br ${connector.accent} text-black`}>
+                            <ConnectorIcon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate text-sm font-semibold text-white">{connector.name}</h3>
+                              <Badge className="border-gray-700 bg-gray-900 text-gray-400">
+                                {connector.category}
+                              </Badge>
+                            </div>
+                            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-400">
+                              {connector.description}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          className={status.connected
+                            ? 'border-green-800 bg-green-900/30 text-green-300'
+                            : 'border-yellow-800 bg-yellow-900/30 text-yellow-200'
+                          }
+                        >
+                          {status.label}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-gray-800 pt-4">
+                        <span className="min-w-0 truncate text-xs text-gray-500">{status.detail}</span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-white"
+                            onClick={() => window.location.href = `/docs#connector-${connector.id}`}
+                          >
+                            Docs
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-white text-black hover:bg-gray-200"
+                            onClick={() => window.location.href = connector.connectPath}
+                          >
+                            Connect
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
 
           {/* Your Memories Panel */}
           <div className="mt-8 pt-4">
