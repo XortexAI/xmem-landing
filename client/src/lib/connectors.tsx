@@ -361,6 +361,10 @@ function keyNameMatchesConnector(name: string, connector: Connector) {
 }
 
 export function getConnectorStatus(connector: Connector, apiKeys: Array<{ name?: string }>) {
+  if (connector.statusKind === "oauth") {
+    return { label: "Not connected", connected: false, detail: "OAuth authorization required" };
+  }
+
   const normalizedNames = apiKeys.map((key) => normalizeKeyName(key.name));
   const hasNamedKey = normalizedNames.some((name) => keyNameMatchesConnector(name, connector));
 
@@ -368,7 +372,7 @@ export function getConnectorStatus(connector: Connector, apiKeys: Array<{ name?:
     return { label: "Connected", connected: true, detail: "Connector key found" };
   }
 
-  if (connector.statusKind === "api-key" || connector.statusKind === "oauth") {
+  if (connector.statusKind === "api-key") {
     return apiKeys.length > 0
       ? { label: "Ready", connected: false, detail: "Use an existing API key" }
       : { label: "Not connected", connected: false, detail: "Create an API key first" };

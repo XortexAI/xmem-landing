@@ -44,6 +44,7 @@ import { Footer } from "@/sections/Footer";
 import { useMemoryGraph, type MemoryNode } from "@/hooks/useMemoryGraph";
 import { MemoryDetails } from "@/components/MemoryDetails";
 import { connectors, getConnectorStatus } from "@/lib/connectors";
+import { useLocation } from "wouter";
 import {
   loadRazorpayCheckout,
   type RazorpayOrder,
@@ -1113,6 +1114,8 @@ function UsageItem({ label, value }: { label: string; value: number }) {
 }
 
 function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading: boolean }) {
+  const [, setLocation] = useLocation();
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0d0d0d] p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -1183,13 +1186,13 @@ function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading:
                     >
                       Docs
                     </Button>
-                    <Button
-                      size="sm"
-                      className="bg-white text-black hover:bg-gray-200"
-                      onClick={() => {
-                        window.location.href = connector.connectPath;
-                      }}
-                    >
+                      <Button
+                        size="sm"
+                        className="bg-white text-black hover:bg-gray-200"
+                        onClick={() => {
+                          setLocation(connector.connectPath);
+                        }}
+                      >
                       Connect
                     </Button>
                   </div>

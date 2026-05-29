@@ -181,6 +181,35 @@ export default function AuthConnect() {
     }
   };
 
+  const startOAuthConnector = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/connectors/${connector.id}/oauth/start`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || `Failed to start ${connector.name} OAuth`);
+      }
+
+      const data: { authorization_url?: string } = await response.json();
+      if (!data.authorization_url) {
+        throw new Error("Connector did not return an authorization URL");
+      }
+      window.location.href = data.authorization_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start OAuth. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated || !hasUsername || !hasCallback || validationError || connected || autoConnecting || autoConnectFailed) return;
     void createConnectorKey(true);
@@ -329,6 +358,12 @@ export default function AuthConnect() {
                     onGenerate={generateTempToken}
                     onCopy={copyText}
                   />
+                ) : connector.statusKind === "oauth" ? (
+                  <OAuthConnectorPanel
+                    connectorName={connector.name}
+                    isLoading={isLoading}
+                    onStart={startOAuthConnector}
+                  />
                 ) : (
                   <ApiKeyPanel
                     connectorName={connector.name}
@@ -430,6 +465,28 @@ function McpTokenPanel({
       <div className="rounded-md border border-gray-800 bg-black/40 p-4">
         <div className="mb-2 text-sm font-medium text-white">Paste into the connector</div>
         <code className="block break-all rounded-md bg-black px-3 py-2 text-sm text-blue-300">{authCommand}</code>
+      </div>
+    </div>
+  );
+}
+
+function OAuthConnectorPanel({
+  connectorName,
+  isLoading,
+  onStart,
+}: {
+  connectorName: string;
+  isLoading: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <Button onClick={onStart} disabled={isLoading} className="w-full bg-gradient-to-r from-white to-cyan-100 text-black hover:from-gray-100 hover:to-cyan-200">
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+        Start {connectorName} OAuth
+      </Button>
+      <div className="rounded-md border border-gray-800 bg-black/40 p-4 text-sm leading-relaxed text-gray-400">
+        You will be sent to {connectorName} to approve access. XMem will only show this connector as connected after the provider flow succeeds.
       </div>
     </div>
   );
