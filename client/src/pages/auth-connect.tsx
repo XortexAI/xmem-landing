@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Footer } from "@/sections/Footer";
 import { Navbar } from "@/sections/Navbar";
-import { connectors, getConnector } from "@/lib/connectors";
+import { ConnectorLogo, connectors, getConnector } from "@/lib/connectors";
 import {
   AlertCircle,
   ArrowLeft,
@@ -88,7 +88,6 @@ export default function AuthConnect() {
       : hasCallback && !callbackIsSafe
         ? "Invalid callback URL. Only local HTTP callbacks are allowed."
         : null;
-  const Icon = connector.icon;
 
   useEffect(() => {
     setTempToken(null);
@@ -281,8 +280,8 @@ export default function AuthConnect() {
             <Card className="border-gray-800 bg-[#111]">
               <CardContent className="p-5">
                 <div className="flex items-start gap-4">
-                  <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
-                    <Icon className="h-7 w-7" />
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white text-black">
+                    <ConnectorLogo connector={connector} className="h-7 w-7" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -302,7 +301,6 @@ export default function AuthConnect() {
               </CardHeader>
               <CardContent className="grid gap-2">
                 {connectors.map((item) => {
-                  const ItemIcon = item.icon;
                   const isActive = item.id === connector.id;
                   return (
                     <button
@@ -310,11 +308,13 @@ export default function AuthConnect() {
                       onClick={() => setLocation(item.connectPath)}
                       className={`flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors ${
                         isActive
-                          ? "border-blue-500/40 bg-blue-500/10 text-white"
+                          ? "border-white/25 bg-white/10 text-white"
                           : "border-gray-800 bg-black/20 text-gray-400 hover:border-gray-700 hover:text-white"
                       }`}
                     >
-                      <ItemIcon className="h-4 w-4 shrink-0" />
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-white/10 bg-white text-black">
+                        <ConnectorLogo connector={item} className="h-3.5 w-3.5" />
+                      </span>
                       <span className="min-w-0 truncate text-sm">{item.name}</span>
                     </button>
                   );
@@ -344,13 +344,18 @@ export default function AuthConnect() {
                   <div className="rounded-md border border-gray-800 bg-black/40 p-4">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-500">Install</div>
                     <div className="flex items-center gap-3">
-                      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md bg-black px-3 py-2 text-sm text-cyan-200">
+                      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md bg-black px-3 py-2 text-sm text-white">
                         {connector.installCommand}
                       </code>
                       <Button variant="ghost" size="sm" onClick={() => copyText(connector.installCommand!, "install")} className="text-gray-400 hover:text-white">
                         {copied === "install" ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
+                  </div>
+                )}
+                {connector.packageNote && (
+                  <div className="rounded-md border border-white/10 bg-white/[0.04] p-4 text-sm leading-relaxed text-gray-300">
+                    {connector.packageNote}
                   </div>
                 )}
 
@@ -446,7 +451,7 @@ function McpTokenPanel({
 }) {
   if (!tempToken) {
     return (
-      <Button onClick={onGenerate} disabled={isLoading} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+      <Button onClick={onGenerate} disabled={isLoading} className="w-full bg-white text-black hover:bg-gray-200">
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Generate connection token
       </Button>
@@ -477,7 +482,7 @@ function McpTokenPanel({
       </div>
       <div className="rounded-md border border-gray-800 bg-black/40 p-4">
         <div className="mb-2 text-sm font-medium text-white">Paste into the connector</div>
-        <code className="block break-all rounded-md bg-black px-3 py-2 text-sm text-blue-300">{authCommand}</code>
+        <code className="block break-all rounded-md bg-black px-3 py-2 text-sm text-white">{authCommand}</code>
       </div>
     </div>
   );
@@ -494,7 +499,7 @@ function OAuthConnectorPanel({
 }) {
   return (
     <div className="space-y-4">
-      <Button onClick={onStart} disabled={isLoading} className="w-full bg-gradient-to-r from-white to-cyan-100 text-black hover:from-gray-100 hover:to-cyan-200">
+      <Button onClick={onStart} disabled={isLoading} className="w-full bg-white text-black hover:bg-gray-200">
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
         Start {connectorName} OAuth
       </Button>
@@ -526,7 +531,7 @@ function ApiKeyPanel({
 }) {
   return (
     <div className="space-y-4">
-      <Button onClick={onCreate} disabled={isLoading || !callbackIsSafe} className="w-full bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700">
+      <Button onClick={onCreate} disabled={isLoading || !callbackIsSafe} className="w-full bg-white text-black hover:bg-gray-200">
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
         {hasCallback ? `Authorize ${connectorName}` : "Create connector key"}
       </Button>

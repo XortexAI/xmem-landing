@@ -1,18 +1,5 @@
 import type { ComponentType } from "react";
 import {
-  Bot,
-  Boxes,
-  Code2,
-  Database,
-  Flame,
-  KeyRound,
-  MousePointer2,
-  Network,
-  Puzzle,
-  Sparkles,
-  Terminal,
-} from "lucide-react";
-import {
   SiClaude,
   SiGithub,
   SiGithubcopilot,
@@ -29,6 +16,7 @@ export interface Connector {
   id: string;
   name: string;
   shortName: string;
+  logoText?: string;
   category: string;
   group: ConnectorGroup;
   statusKind: ConnectorStatusKind;
@@ -36,8 +24,9 @@ export interface Connector {
   docs: string[];
   connectPath: string;
   accent: string;
-  icon: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string }>;
   installCommand?: string;
+  packageNote?: string;
 }
 
 export const connectors: Connector[] = [
@@ -51,7 +40,7 @@ export const connectors: Connector[] = [
     description: "Install the XMem OpenCode plugin and connect it with browser auth.",
     connectPath: "/auth/connect/opencode",
     accent: "from-sky-400 to-cyan-300",
-    icon: Terminal,
+    logoText: "OpenCode",
     installCommand: "bunx opencode-xmem@latest install",
     docs: [
       "Run the installer in your OpenCode environment.",
@@ -71,9 +60,9 @@ export const connectors: Connector[] = [
     connectPath: "/auth/connect/claude-code",
     accent: "from-amber-300 to-orange-200",
     icon: SiClaude,
-    installCommand: "npx xmem-claude-code@latest install",
+    packageNote: "NPM package is not published yet. Use the repo-local plugin bundle under XMem/plugin/xmem-claude until publishing is enabled.",
     docs: [
-      "Run the connector installer from the project or home directory you want Claude Code to use.",
+      "Use the repo-local plugin bundle under XMem/plugin/xmem-claude until the npm installer is published.",
       "Keep XMEM_API_KEY and XMEM_USERNAME in your environment or secret store.",
       "Restart Claude Code so the XMem MCP server and slash commands are loaded.",
       "Use XMem memory tools when you need prior project or user context.",
@@ -89,10 +78,10 @@ export const connectors: Connector[] = [
     description: "Install XMem MCP config and Cursor rules for project memory inside Cursor.",
     connectPath: "/auth/connect/cursor",
     accent: "from-sky-300 to-blue-200",
-    icon: MousePointer2,
-    installCommand: "npx xmem-cursor@latest install",
+    logoText: "Cursor",
+    packageNote: "NPM package is not published yet. Use the repo-local plugin bundle under XMem/plugin/xmem-cursor until publishing is enabled.",
     docs: [
-      "Run the connector installer in a workspace or pass --config-root for a specific project.",
+      "Use the repo-local plugin bundle under XMem/plugin/xmem-cursor until the npm installer is published.",
       "Set XMEM_API_KEY and XMEM_USERNAME in the Cursor MCP launch environment.",
       "Open Cursor settings and confirm the xmem MCP server is available.",
       "Use XMem tools for memory search, recall, and durable project notes.",
@@ -108,10 +97,10 @@ export const connectors: Connector[] = [
     description: "Configure Hermes Agent with XMem MCP memory and shared agent instructions.",
     connectPath: "/auth/connect/hermes",
     accent: "from-rose-300 to-pink-200",
-    icon: Sparkles,
-    installCommand: "npx xmem-hermes@latest install",
+    logoText: "Hermes",
+    packageNote: "NPM package is not published yet. Use the repo-local connector under XMem/plugin/xmem-hermes until publishing is enabled.",
     docs: [
-      "Run the Hermes connector installer to create local MCP config and HERMES.md guidance.",
+      "Use the repo-local connector under XMem/plugin/xmem-hermes until the npm installer is published.",
       "Keep XMEM_API_KEY out of the generated files and provide it through the environment.",
       "Restart Hermes after installing the connector config.",
       "Use XMem for persistent memory across Hermes sessions.",
@@ -127,10 +116,10 @@ export const connectors: Connector[] = [
     description: "Install XMem as a Codex plugin plus MCP-backed project memory instructions.",
     connectPath: "/auth/connect/codex",
     accent: "from-indigo-300 to-cyan-200",
-    icon: Bot,
-    installCommand: "npx xmem-codex@latest install",
+    icon: SiOpenai,
+    packageNote: "NPM package is not published yet. Use the repo-local plugin bundle under XMem/plugin/xmem-codex until publishing is enabled.",
     docs: [
-      "Run the Codex connector installer to create config.toml and AGENTS.md memory guidance.",
+      "Use the repo-local plugin bundle under XMem/plugin/xmem-codex until the npm installer is published.",
       "Install the included Codex plugin bundle when you want Codex app discoverability.",
       "Set XMEM_API_KEY and XMEM_USERNAME in the runtime environment.",
       "Use XMem tools for durable user and project memory.",
@@ -146,10 +135,10 @@ export const connectors: Connector[] = [
     description: "Connect OpenClaw to XMem with an MCP plugin bundle and memory skill.",
     connectPath: "/auth/connect/openclaw",
     accent: "from-red-300 to-orange-200",
-    icon: Flame,
-    installCommand: "npx xmem-openclaw@latest install",
+    logoText: "OpenClaw",
+    packageNote: "NPM package is not published yet. Use the repo-local plugin bundle under XMem/plugin/xmem-openclaw until publishing is enabled.",
     docs: [
-      "Run the OpenClaw connector installer to generate plugin and MCP files.",
+      "Use the repo-local plugin bundle under XMem/plugin/xmem-openclaw until the npm package is published.",
       "Provide XMEM_API_KEY and XMEM_USERNAME from the environment.",
       "Install or reload the OpenClaw plugin bundle.",
       "Use the XMem memory skill for cross-session recall.",
@@ -165,7 +154,7 @@ export const connectors: Connector[] = [
     description: "Generate a temporary token for MCP-compatible clients.",
     connectPath: "/auth/connect/mcp",
     accent: "from-violet-400 to-fuchsia-300",
-    icon: Network,
+    logoText: "MCP",
     docs: [
       "Generate a one-time token from this page.",
       "Paste authenticate(token=\"...\") into the MCP client.",
@@ -309,7 +298,7 @@ export const connectors: Connector[] = [
     description: "Use direct REST, Python, or TypeScript SDK access.",
     connectPath: "/auth/connect/api",
     accent: "from-blue-300 to-indigo-200",
-    icon: KeyRound,
+    logoText: "API",
     docs: [
       "Create an API key on the dashboard.",
       "Send Authorization: Bearer <key> with every request.",
@@ -327,7 +316,7 @@ export const connectors: Connector[] = [
     description: "Bring XMem into an internal agent, plugin, or workflow.",
     connectPath: "/auth/connect/custom",
     accent: "from-pink-300 to-rose-200",
-    icon: Code2,
+    logoText: "SDK",
     docs: [
       "Create a scoped API key for your connector.",
       "Store the key in your secret manager or local env.",
@@ -390,4 +379,24 @@ export function connectorLogoLabel(connector: Connector) {
   return `${connector.name} logo`;
 }
 
-export { Bot, Boxes, Database, Puzzle };
+export function ConnectorLogo({
+  connector,
+  className = "h-5 w-5",
+}: {
+  connector: Connector;
+  className?: string;
+}) {
+  const Icon = connector.icon;
+  if (Icon) {
+    return <Icon aria-label={connectorLogoLabel(connector)} className={className} />;
+  }
+
+  return (
+    <span
+      aria-label={connectorLogoLabel(connector)}
+      className="max-w-[3.8rem] truncate text-center text-[10px] font-semibold uppercase leading-none tracking-normal text-current"
+    >
+      {connector.logoText || connector.shortName}
+    </span>
+  );
+}

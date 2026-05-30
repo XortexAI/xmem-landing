@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Search } from "lucide-react";
 import { Link } from "wouter";
-import { connectors, type ConnectorGroup } from "@/lib/connectors";
+import { ConnectorLogo, connectors, type ConnectorGroup } from "@/lib/connectors";
 import { RevealSection } from "../components/shared/RevealSection";
 
 const groups: ConnectorGroup[] = ["MCP", "Plugins", "Knowledge bases", "Apps & extensions", "Developer"];
@@ -20,7 +20,7 @@ export function ConnectorsSection() {
         <RevealSection className="mb-6 overflow-hidden rounded-lg border border-white/10 bg-[#15181f]">
           <div className="grid min-h-[180px] gap-6 overflow-hidden md:grid-cols-[1fr_420px]">
             <div className="flex flex-col justify-center px-7 py-8">
-              <div className="mb-5 w-fit rounded-md bg-cyan-300 px-3 py-1 text-xs font-bold uppercase tracking-normal text-black">
+              <div className="mb-5 w-fit rounded-md bg-white px-3 py-1 text-xs font-bold uppercase tracking-normal text-black">
                 Featured
               </div>
               <h2 className="text-2xl font-bold text-white md:text-3xl">
@@ -30,9 +30,8 @@ export function ConnectorsSection() {
                 Connect XMem to coding agents, MCP clients, knowledge bases, and workspace apps from one dashboard.
               </p>
             </div>
-            <div className="relative hidden items-center justify-center overflow-hidden bg-[#111827] md:flex">
-              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(34,211,238,0.20),rgba(16,185,129,0.12),rgba(99,102,241,0.14))]" />
-              <div className="relative text-[7rem] font-black leading-none text-cyan-200/25 lg:text-[9rem]">
+            <div className="relative hidden items-center justify-center overflow-hidden bg-[#0f0f0f] md:flex">
+              <div className="relative text-[7rem] font-black leading-none tracking-normal text-white/15 lg:text-[9rem]">
                 MCP
               </div>
             </div>
@@ -78,7 +77,6 @@ export function ConnectorsSection() {
 
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {groupConnectors.map((connector, index) => {
-                      const Icon = connector.icon;
                       return (
                         <motion.div
                           key={connector.id}
@@ -89,8 +87,8 @@ export function ConnectorsSection() {
                           className="rounded-lg border border-white/[0.07] bg-[#121419] p-5 transition-colors hover:border-white/20"
                         >
                           <div className="mb-5 flex items-start justify-between gap-3">
-                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
-                              <Icon className="h-5 w-5" />
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white text-black">
+                              <ConnectorLogo connector={connector} />
                             </div>
                             <Link href={`/docs#connector-${connector.id}`} className="inline-flex items-center gap-1 text-xs text-white/45 hover:text-white">
                               <BookOpen className="h-3.5 w-3.5" />
