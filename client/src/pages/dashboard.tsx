@@ -43,7 +43,7 @@ import { Navbar } from "@/sections/Navbar";
 import { Footer } from "@/sections/Footer";
 import { useMemoryGraph, type MemoryNode } from "@/hooks/useMemoryGraph";
 import { MemoryDetails } from "@/components/MemoryDetails";
-import { connectors, getConnectorStatus } from "@/lib/connectors";
+import { ConnectorLogo, connectors, getConnectorStatus } from "@/lib/connectors";
 import { useLocation } from "wouter";
 import {
   loadRazorpayCheckout,
@@ -1144,15 +1144,14 @@ function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading:
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {connectors.map((connector) => {
           const status = getConnectorStatus(connector, apiKeys);
-          const ConnectorIcon = connector.icon;
 
           return (
             <Card key={connector.id} className="border-white/10 bg-[#0d0d0d]">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
-                      <ConnectorIcon className="h-5 w-5" />
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white text-black">
+                      <ConnectorLogo connector={connector} />
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
