@@ -37,6 +37,7 @@ export interface Connector {
   accent: string;
   icon: ComponentType<{ className?: string }>;
   installCommand?: string;
+  logo?: string;
 }
 
 export const connectors: Connector[] = [
@@ -58,6 +59,7 @@ export const connectors: Connector[] = [
       "Approve the browser connection when XMem opens.",
       "Restart OpenCode so the xmem tool is loaded.",
     ],
+    logo: "opencode.png",
   },
   {
     id: "claude-code",
@@ -77,6 +79,7 @@ export const connectors: Connector[] = [
       "Restart Claude Code so the XMem MCP server and slash commands are loaded.",
       "Use XMem memory tools when you need prior project or user context.",
     ],
+    logo: "claude.jpeg",
   },
   {
     id: "cursor",
@@ -96,6 +99,7 @@ export const connectors: Connector[] = [
       "Open Cursor settings and confirm the xmem MCP server is available.",
       "Use XMem tools for memory search, recall, and durable project notes.",
     ],
+    logo: "cursor.jpeg",
   },
   {
     id: "hermes",
@@ -115,6 +119,7 @@ export const connectors: Connector[] = [
       "Restart Hermes after installing the connector config.",
       "Use XMem for persistent memory across Hermes sessions.",
     ],
+    logo: "hermes.png",
   },
   {
     id: "codex",
@@ -134,6 +139,7 @@ export const connectors: Connector[] = [
       "Set XMEM_API_KEY and XMEM_USERNAME in the runtime environment.",
       "Use XMem tools for durable user and project memory.",
     ],
+    logo: "codex.jpeg",
   },
   {
     id: "openclaw",
@@ -153,8 +159,8 @@ export const connectors: Connector[] = [
       "Install or reload the OpenClaw plugin bundle.",
       "Use the XMem memory skill for cross-session recall.",
     ],
+    logo: "openclaw.jpeg",
   },
-
   {
     id: "claude",
     name: "Claude Desktop",
@@ -172,6 +178,7 @@ export const connectors: Connector[] = [
       "Run authenticate(token=\"...\") from Claude Desktop.",
       "Keep Claude Desktop open while the server stores the permanent key.",
     ],
+    logo: "claude.jpeg",
   },
   {
     id: "chatgpt",
@@ -190,6 +197,7 @@ export const connectors: Connector[] = [
       "Open Advanced OAuth settings and set client name to xmem-mcp.",
       "Click Create, approve the connection on XMem, and you're ready.",
     ],
+    logo: "chatgpt.png",
   },
   {
     id: "chrome",

@@ -502,6 +502,7 @@ function ChatGptSetupPanel({
           under Advanced settings.
         </>
       ),
+      image: "/docs/chatgpt1",
     },
     {
       title: "Configure the new app",
@@ -510,6 +511,7 @@ function ChatGptSetupPanel({
         { label: "Name", value: "Xmem", key: "name", highlight: false },
         { label: "Connection \xB7 Server URL", value: "https://mcp.xmem.in", key: "url", highlight: true },
       ],
+      image: "/docs/chatgpt2",
     },
     {
       title: "Set Advanced OAuth settings",
@@ -522,6 +524,7 @@ function ChatGptSetupPanel({
         </>
       ),
       fields: [{ label: "OAuth Client Name", value: "xmem-mcp", key: "oauth", highlight: false }],
+      image: "/docs/chatgpt3",
     },
     {
       title: "Approve the connection",
@@ -533,6 +536,7 @@ function ChatGptSetupPanel({
           <span className="font-mono text-emerald-300">@Xmem</span> in any ChatGPT conversation!
         </>
       ),
+      image: "/docs/chatgpt4",
     },
   ];
 
@@ -547,6 +551,7 @@ function ChatGptSetupPanel({
             <div className="min-w-0 flex-1">
               <h4 className="font-semibold text-white">{step.title}</h4>
               <p className="mt-1.5 text-sm leading-relaxed text-gray-400">{step.description}</p>
+              
               {step.fields && (
                 <div className="mt-3 space-y-2">
                   {step.fields.map((field) => (
@@ -578,6 +583,16 @@ function ChatGptSetupPanel({
                       </Button>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {step.image && (
+                <div className="mt-4 overflow-hidden rounded-lg border border-white/10 bg-black/40 shadow-inner group">
+                  <img
+                    src={step.image}
+                    alt={step.title}
+                    className="w-full h-auto object-cover opacity-90 transition-all duration-300 hover:scale-[1.01] hover:opacity-100"
+                  />
                 </div>
               )}
             </div>

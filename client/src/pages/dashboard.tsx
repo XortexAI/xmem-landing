@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, Suspense, lazy } from "react";
+import { useEffect, useState, useCallback, Suspense, lazy, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ import {
   BookOpen,
   Cable,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Edit2,
   ExternalLink,
@@ -1115,17 +1117,50 @@ function UsageItem({ label, value }: { label: string; value: number }) {
 
 function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading: boolean }) {
   const [, setLocation] = useLocation();
+  const [activeGroup, setActiveGroup] = useState<string>("All");
+  const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const groups = [
+    { id: "All", name: "All Connectors" },
+    { id: "MCP", name: "MCP Clients" },
+    { id: "Plugins", name: "Coding Plugins" },
+    { id: "Knowledge bases", name: "Knowledge Bases" },
+    { id: "Apps & extensions", name: "Apps & Extensions" },
+    { id: "Developer", name: "Developer APIs" }
+  ];
+
+  const filteredConnectors = activeGroup === "All"
+    ? connectors
+    : connectors.filter(c => c.group === activeGroup);
+
+  const scroll = (direction: "left" | "right") => {
+    if (carouselRef.current) {
+      const scrollAmount = 300; // width of a card (280) + gap (16)
+      carouselRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth"
+      });
+    }
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0d0d0d] p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      <style dangerouslySetInnerHTML={{__html: `
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}} />
+
+      {/* Header Banner */}
+      <div className="flex flex-col gap-4 rounded-xl border border-white/5 bg-[#0d0d0d]/80 backdrop-blur-md p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-gray-400">
-            <Cable className="h-3.5 w-3.5" />
+            <Cable className="h-3.5 w-3.5 text-emerald-400" />
             Connector status
           </div>
-          <h2 className="text-xl font-semibold text-white">Connect XMem everywhere</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
+          <h2 className="text-xl font-bold tracking-tight text-white">Connect XMem everywhere</h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-gray-400">
             See which agents and clients are connected, then open the right setup flow or docs.
           </p>
         </div>
@@ -1141,66 +1176,130 @@ function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading:
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {connectors.map((connector) => {
-          const status = getConnectorStatus(connector, apiKeys);
-          const ConnectorIcon = connector.icon;
+      {/* Categories Tabs */}
+      <div className="flex flex-wrap gap-2 pb-1 border-b border-white/[0.04]">
+        {groups.map((group) => (
+          <button
+            key={group.id}
+            onClick={() => setActiveGroup(group.id)}
+            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all duration-300 ${
+              activeGroup === group.id
+                ? "bg-white text-black border-white shadow-md shadow-white/5"
+                : "bg-transparent text-gray-400 border-transparent hover:text-white hover:bg-white/[0.03]"
+            }`}
+          >
+            {group.name}
+          </button>
+        ))}
+      </div>
 
-          return (
-            <Card key={connector.id} className="border-white/10 bg-[#0d0d0d]">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${connector.accent} text-black`}>
-                      <ConnectorIcon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-sm font-semibold text-white">{connector.name}</h3>
-                        <Badge className="border-white/10 bg-white/[0.05] text-gray-400">{connector.category}</Badge>
+      {/* Marketplace Swiper */}
+      <div className="relative group/carousel">
+        {/* Left Arrow Button */}
+        <button
+          onClick={() => scroll("left")}
+          className="absolute -left-5 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/75 backdrop-blur-md text-gray-400 hover:bg-black/90 hover:text-white transition-all shadow-xl hover:scale-105 active:scale-95 opacity-0 group-hover/carousel:opacity-100 duration-300 md:flex hidden"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        {/* Horizontal scroll grid */}
+        <div
+          ref={carouselRef}
+          className="flex gap-4 overflow-x-auto scroll-smooth py-2 px-1 no-scrollbar"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {filteredConnectors.length === 0 ? (
+            <div className="w-full py-8 text-center text-gray-500 text-sm border border-dashed border-white/5 rounded-xl">
+              No connectors available in this category.
+            </div>
+          ) : (
+            filteredConnectors.map((connector) => {
+              const status = getConnectorStatus(connector, apiKeys);
+              const ConnectorIcon = connector.icon;
+
+              return (
+                <div
+                  key={connector.id}
+                  className="group relative flex flex-col justify-between rounded-xl border border-white/5 bg-[#0d0d0d]/85 p-5 transition-all duration-300 hover:border-white/20 hover:bg-[#121212]/95 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)] w-[280px] shrink-0"
+                >
+                  <div className="space-y-4">
+                    {/* Logo & Status */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#161616] border border-white/5 overflow-hidden transition-all duration-300 group-hover:border-white/15">
+                        {connector.logo && !logoErrors[connector.id] ? (
+                          <img
+                            src={`/connector_logos/${connector.logo}`}
+                            alt={connector.name}
+                            className="h-8 w-8 object-contain transition-transform duration-300 group-hover:scale-105"
+                            onError={() => setLogoErrors(prev => ({ ...prev, [connector.id]: true }))}
+                          />
+                        ) : (
+                          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${connector.accent} text-black`}>
+                            <ConnectorIcon className="h-5 w-5" />
+                          </div>
+                        )}
                       </div>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-400">{connector.description}</p>
+
+                      <Badge
+                        className={`text-[10px] font-semibold tracking-wide py-0.5 border ${
+                          status.connected
+                            ? "border-green-800/40 bg-green-950/20 text-green-400"
+                            : status.label === "Ready"
+                            ? "border-blue-800/40 bg-blue-950/20 text-blue-400"
+                            : "border-zinc-800 bg-zinc-900/40 text-zinc-400"
+                        }`}
+                      >
+                        {isLoading ? "Checking" : status.label}
+                      </Badge>
+                    </div>
+
+                    {/* Title & Category info */}
+                    <div>
+                      <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-emerald-400 transition-colors duration-300">
+                        {connector.name}
+                      </h3>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mt-0.5 block">
+                        {connector.category}
+                      </span>
                     </div>
                   </div>
-                  <Badge
-                    className={
-                      status.connected
-                        ? "border-green-800 bg-green-900/30 text-green-300"
-                        : "border-yellow-800 bg-yellow-900/30 text-yellow-200"
-                    }
-                  >
-                    {isLoading ? "Checking" : status.label}
-                  </Badge>
-                </div>
 
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
-                  <span className="min-w-0 truncate text-xs text-gray-500">{isLoading ? "Loading API keys" : status.detail}</span>
-                  <div className="flex shrink-0 items-center gap-2">
+                  {/* Docs / Connect Actions */}
+                  <div className="mt-6 flex gap-2">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="text-gray-400 hover:text-white"
+                      className="flex-1 border-white/5 bg-white/[0.02] text-gray-300 hover:bg-white/[0.08] hover:text-white text-xs h-8"
                       onClick={() => {
                         window.location.href = `/docs#connector-${connector.id}`;
                       }}
                     >
                       Docs
                     </Button>
-                      <Button
-                        size="sm"
-                        className="bg-white text-black hover:bg-gray-200"
-                        onClick={() => {
-                          setLocation(connector.connectPath);
-                        }}
-                      >
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-white text-black hover:bg-gray-200 text-xs h-8 font-semibold"
+                      onClick={() => {
+                        setLocation(connector.connectPath);
+                      }}
+                    >
                       Connect
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+              );
+            })
+          )}
+        </div>
+
+        {/* Right Arrow Button */}
+        <button
+          onClick={() => scroll("right")}
+          className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/75 backdrop-blur-md text-gray-400 hover:bg-black/90 hover:text-white transition-all shadow-xl hover:scale-105 active:scale-95 opacity-0 group-hover/carousel:opacity-100 duration-300 md:flex hidden"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
     </div>
   );
