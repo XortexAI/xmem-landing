@@ -32,6 +32,7 @@ export interface RazorpayOptions {
   modal?: {
     ondismiss?: () => void;
   };
+  config?: any;
 }
 
 type RazorpayConstructor = new (options: RazorpayOptions) => {
