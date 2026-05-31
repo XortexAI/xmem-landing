@@ -133,11 +133,11 @@ export default function OAuthAuthorize() {
           {/* ── Connection visual ── */}
           <div className="mb-8 flex items-center justify-center gap-6">
             {/* Requesting app */}
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/5 bg-[#151515] overflow-hidden shadow-lg shadow-black/20">
+            <div className="flex h-16 w-16 items-center justify-center">
               {clientLogo ? (
-                <img src={clientLogo} alt={clientInfo.name} className="h-10 w-10 object-contain" />
+                <img src={clientLogo} alt={clientInfo.name} className="max-h-full max-w-full object-contain" />
               ) : (
-                <ClientIcon className="h-8 w-8 text-white" />
+                <ClientIcon className="h-12 w-12 text-white" />
               )}
             </div>
 
@@ -153,8 +153,8 @@ export default function OAuthAuthorize() {
             </div>
 
             {/* XMem */}
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/5 bg-[#151515] overflow-hidden shadow-lg shadow-black/20">
-              <img src="/logo.png" alt="XMem" className="h-8 w-auto invert" />
+            <div className="flex h-16 w-16 items-center justify-center">
+              <img src="/logo.png" alt="XMem" className="max-h-full max-w-full object-contain invert" />
             </div>
           </div>
 
