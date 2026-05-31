@@ -7,7 +7,6 @@ import {
   Flame,
   KeyRound,
   MousePointer2,
-  Network,
   Puzzle,
   Sparkles,
   Terminal,
@@ -155,24 +154,7 @@ export const connectors: Connector[] = [
       "Use the XMem memory skill for cross-session recall.",
     ],
   },
-  {
-    id: "mcp",
-    name: "MCP Server",
-    shortName: "MCP",
-    category: "Protocol",
-    group: "MCP",
-    statusKind: "mcp-token",
-    description: "Generate a temporary token for MCP-compatible clients.",
-    connectPath: "/auth/connect/mcp",
-    accent: "from-violet-400 to-fuchsia-300",
-    icon: Network,
-    docs: [
-      "Generate a one-time token from this page.",
-      "Paste authenticate(token=\"...\") into the MCP client.",
-      "The MCP server exchanges it for a permanent XMem API key.",
-      "Use the generated server config in Claude Desktop, ChatGPT, or another MCP host.",
-    ],
-  },
+
   {
     id: "claude",
     name: "Claude Desktop",
@@ -203,10 +185,10 @@ export const connectors: Connector[] = [
     accent: "from-emerald-300 to-teal-200",
     icon: SiOpenai,
     docs: [
-      "Add the XMem MCP server in ChatGPT connectors.",
-      "Generate a temporary token here.",
-      "Authenticate the server with authenticate(token=\"...\").",
-      "Use XMem search and recall from ChatGPT conversations.",
+      "Open ChatGPT Settings → Apps and click Create app.",
+      "Set name to Xmem and Server URL to https://mcp.xmem.in.",
+      "Open Advanced OAuth settings and set client name to xmem-mcp.",
+      "Click Create, approve the connection on XMem, and you're ready.",
     ],
   },
   {
@@ -361,7 +343,17 @@ function keyNameMatchesConnector(name: string, connector: Connector) {
     return true;
   }
 
-  return connector.id === "mcp" && name.startsWith("mcp client");
+  // Match MCP Client keys for Claude Desktop (from temp-token exchange)
+  if (connector.id === "claude" && name.startsWith("mcp client")) {
+    return true;
+  }
+
+  // Match OAuth Client keys for ChatGPT (from OAuth flow with xmem-mcp client)
+  if (connector.id === "chatgpt" && (name.includes("xmem-mcp") || name.includes("chatgpt"))) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getConnectorStatus(connector: Connector, apiKeys: Array<{ name?: string }>) {

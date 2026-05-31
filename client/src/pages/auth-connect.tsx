@@ -361,6 +361,8 @@ export default function AuthConnect() {
                       <span className="font-medium">Connected. Redirecting...</span>
                     </div>
                   </div>
+                ) : connector.id === "chatgpt" ? (
+                  <ChatGptSetupPanel copied={copied} onCopy={copyText} />
                 ) : connector.statusKind === "mcp-token" ? (
                   <McpTokenPanel
                     tempToken={tempToken}
@@ -479,6 +481,119 @@ function McpTokenPanel({
         <div className="mb-2 text-sm font-medium text-white">Paste into the connector</div>
         <code className="block break-all rounded-md bg-black px-3 py-2 text-sm text-blue-300">{authCommand}</code>
       </div>
+    </div>
+  );
+}
+
+function ChatGptSetupPanel({
+  copied,
+  onCopy,
+}: {
+  copied: string | null;
+  onCopy: (value: string, key: string) => void;
+}) {
+  const steps = [
+    {
+      title: "Open ChatGPT Connector Settings",
+      description: (
+        <>
+          Go to <span className="font-medium text-white">Settings → Apps</span> and click{" "}
+          <span className="rounded bg-white/10 px-1.5 py-0.5 font-medium text-white">Create app</span>{" "}
+          under Advanced settings.
+        </>
+      ),
+    },
+    {
+      title: "Configure the new app",
+      description: "Fill in these details in the New App dialog:",
+      fields: [
+        { label: "Name", value: "Xmem", key: "name", highlight: false },
+        { label: "Connection \xB7 Server URL", value: "https://mcp.xmem.in", key: "url", highlight: true },
+      ],
+    },
+    {
+      title: "Set Advanced OAuth settings",
+      description: (
+        <>
+          Click <span className="font-medium text-white">Advanced OAuth settings</span> and enter the
+          client name below. Then check{" "}
+          <span className="font-medium text-white">&quot;I understand and want to continue&quot;</span>{" "}
+          and click <span className="font-medium text-white">Create</span>.
+        </>
+      ),
+      fields: [{ label: "OAuth Client Name", value: "xmem-mcp", key: "oauth", highlight: false }],
+    },
+    {
+      title: "Approve the connection",
+      description: (
+        <>
+          You'll be redirected to XMem to authorize the connection. Click{" "}
+          <span className="font-medium text-white">Approve</span> to grant ChatGPT access to your
+          memories and code indexes. That's it &mdash; start using{" "}
+          <span className="font-mono text-emerald-300">@Xmem</span> in any ChatGPT conversation!
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {steps.map((step, i) => (
+        <div key={i} className="rounded-lg border border-white/10 bg-black/30 p-4 sm:p-5">
+          <div className="flex items-start gap-4">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-400 text-sm font-bold text-black">
+              {i + 1}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-semibold text-white">{step.title}</h4>
+              <p className="mt-1.5 text-sm leading-relaxed text-gray-400">{step.description}</p>
+              {step.fields && (
+                <div className="mt-3 space-y-2">
+                  {step.fields.map((field) => (
+                    <div
+                      key={field.key}
+                      className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/50 px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                          {field.label}
+                        </span>
+                        <p
+                          className={`truncate font-mono text-sm ${field.highlight ? "text-emerald-300" : "text-white"}`}
+                        >
+                          {field.value}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onCopy(field.value, field.key)}
+                        className="shrink-0 text-gray-400 hover:text-white"
+                      >
+                        {copied === field.key ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-400" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <a
+        href="https://chatgpt.com/#settings/Connectors"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-emerald-500/30"
+      >
+        Open ChatGPT Settings
+        <ExternalLink className="h-4 w-4" />
+      </a>
     </div>
   );
 }
