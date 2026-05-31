@@ -45,7 +45,7 @@ import { Navbar } from "@/sections/Navbar";
 import { Footer } from "@/sections/Footer";
 import { useMemoryGraph, type MemoryNode } from "@/hooks/useMemoryGraph";
 import { MemoryDetails } from "@/components/MemoryDetails";
-import { connectors, getConnectorStatus } from "@/lib/connectors";
+import { connectors, getConnectorStatus, type Connector } from "@/lib/connectors";
 import { useLocation } from "wouter";
 import {
   loadRazorpayCheckout,
@@ -1115,24 +1115,24 @@ function UsageItem({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading: boolean }) {
-  const [, setLocation] = useLocation();
-  const [activeGroup, setActiveGroup] = useState<string>("All");
-  const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
+function ConnectorRow({
+  title,
+  connectorsList,
+  apiKeys,
+  isLoading,
+  logoErrors,
+  setLogoErrors,
+  setLocation,
+}: {
+  title: string;
+  connectorsList: Connector[];
+  apiKeys: APIKey[];
+  isLoading: boolean;
+  logoErrors: Record<string, boolean>;
+  setLogoErrors: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  setLocation: (path: string) => void;
+}) {
   const carouselRef = useRef<HTMLDivElement>(null);
-
-  const groups = [
-    { id: "All", name: "All Connectors" },
-    { id: "MCP", name: "MCP Clients" },
-    { id: "Plugins", name: "Coding Plugins" },
-    { id: "Knowledge bases", name: "Knowledge Bases" },
-    { id: "Apps & extensions", name: "Apps & Extensions" },
-    { id: "Developer", name: "Developer APIs" }
-  ];
-
-  const filteredConnectors = activeGroup === "All"
-    ? connectors
-    : connectors.filter(c => c.group === activeGroup);
 
   const scroll = (direction: "left" | "right") => {
     if (carouselRef.current) {
@@ -1144,54 +1144,14 @@ function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading:
     }
   };
 
+  if (connectorsList.length === 0) return null;
+
   return (
-    <div className="space-y-6">
-      <style dangerouslySetInnerHTML={{__html: `
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-      `}} />
-
-      {/* Header Banner */}
-      <div className="flex flex-col gap-4 rounded-xl border border-white/5 bg-[#0d0d0d]/80 backdrop-blur-md p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-gray-400">
-            <Cable className="h-3.5 w-3.5 text-emerald-400" />
-            Connector status
-          </div>
-          <h2 className="text-xl font-bold tracking-tight text-white">Connect XMem everywhere</h2>
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-gray-400">
-            See which agents and clients are connected, then open the right setup flow or docs.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          className="h-9 w-full border-white/10 bg-transparent text-gray-300 hover:bg-white/[0.06] hover:text-white sm:w-auto"
-          onClick={() => {
-            window.location.href = "/docs#connectors";
-          }}
-        >
-          <BookOpen className="mr-2 h-4 w-4" />
-          Docs
-        </Button>
-      </div>
-
-      {/* Categories Tabs */}
-      <div className="flex flex-wrap gap-2 pb-1 border-b border-white/[0.04]">
-        {groups.map((group) => (
-          <button
-            key={group.id}
-            onClick={() => setActiveGroup(group.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all duration-300 ${
-              activeGroup === group.id
-                ? "bg-white text-black border-white shadow-md shadow-white/5"
-                : "bg-transparent text-gray-400 border-transparent hover:text-white hover:bg-white/[0.03]"
-            }`}
-          >
-            {group.name}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-4">
+      {/* Row Title */}
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 px-1">
+        {title}
+      </h3>
 
       {/* Marketplace Swiper */}
       <div className="relative group/carousel">
@@ -1209,88 +1169,82 @@ function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading:
           className="flex gap-4 overflow-x-auto scroll-smooth py-2 px-1 no-scrollbar"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {filteredConnectors.length === 0 ? (
-            <div className="w-full py-8 text-center text-gray-500 text-sm border border-dashed border-white/5 rounded-xl">
-              No connectors available in this category.
-            </div>
-          ) : (
-            filteredConnectors.map((connector) => {
-              const status = getConnectorStatus(connector, apiKeys);
-              const ConnectorIcon = connector.icon;
+          {connectorsList.map((connector) => {
+            const status = getConnectorStatus(connector, apiKeys);
+            const ConnectorIcon = connector.icon;
 
-              return (
-                <div
-                  key={connector.id}
-                  className="group relative flex flex-col justify-between rounded-xl border border-white/5 bg-[#0d0d0d]/85 p-5 transition-all duration-300 hover:border-white/20 hover:bg-[#121212]/95 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)] w-[280px] shrink-0"
-                >
-                  <div className="space-y-4">
-                    {/* Logo & Status */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#161616] border border-white/5 overflow-hidden transition-all duration-300 group-hover:border-white/15">
-                        {connector.logo && !logoErrors[connector.id] ? (
-                          <img
-                            src={`/connector_logos/${connector.logo}`}
-                            alt={connector.name}
-                            className="h-8 w-8 object-contain transition-transform duration-300 group-hover:scale-105"
-                            onError={() => setLogoErrors(prev => ({ ...prev, [connector.id]: true }))}
-                          />
-                        ) : (
-                          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${connector.accent} text-black`}>
-                            <ConnectorIcon className="h-5 w-5" />
-                          </div>
-                        )}
-                      </div>
-
-                      <Badge
-                        className={`text-[10px] font-semibold tracking-wide py-0.5 border ${
-                          status.connected
-                            ? "border-green-800/40 bg-green-950/20 text-green-400"
-                            : status.label === "Ready"
-                            ? "border-blue-800/40 bg-blue-950/20 text-blue-400"
-                            : "border-zinc-800 bg-zinc-900/40 text-zinc-400"
-                        }`}
-                      >
-                        {isLoading ? "Checking" : status.label}
-                      </Badge>
+            return (
+              <div
+                key={connector.id}
+                className="group relative flex flex-col justify-between rounded-xl border border-white/5 bg-[#0d0d0d]/85 p-5 transition-all duration-300 hover:border-white/20 hover:bg-[#121212]/95 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)] w-[280px] shrink-0"
+              >
+                <div className="space-y-4">
+                  {/* Logo & Status */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#161616] border border-white/5 overflow-hidden transition-all duration-300 group-hover:border-white/15">
+                      {connector.logo && !logoErrors[connector.id] ? (
+                        <img
+                          src={`/connector_logos/${connector.logo}`}
+                          alt={connector.name}
+                          className="h-8 w-8 object-contain transition-transform duration-300 group-hover:scale-105"
+                          onError={() => setLogoErrors(prev => ({ ...prev, [connector.id]: true }))}
+                        />
+                      ) : (
+                        <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${connector.accent} text-black`}>
+                          <ConnectorIcon className="h-5 w-5" />
+                        </div>
+                      )}
                     </div>
 
-                    {/* Title & Category info */}
-                    <div>
-                      <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-emerald-400 transition-colors duration-300">
-                        {connector.name}
-                      </h3>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mt-0.5 block">
-                        {connector.category}
-                      </span>
-                    </div>
+                    <Badge
+                      className={`text-[10px] font-semibold tracking-wide py-0.5 border ${
+                        status.connected
+                          ? "border-green-800/40 bg-green-950/20 text-green-400"
+                          : status.label === "Ready"
+                          ? "border-blue-800/40 bg-blue-950/20 text-blue-400"
+                          : "border-zinc-800 bg-zinc-900/40 text-zinc-400"
+                      }`}
+                    >
+                      {isLoading ? "Checking" : status.label}
+                    </Badge>
                   </div>
 
-                  {/* Docs / Connect Actions */}
-                  <div className="mt-6 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-white/5 bg-white/[0.02] text-gray-300 hover:bg-white/[0.08] hover:text-white text-xs h-8"
-                      onClick={() => {
-                        window.location.href = `/docs#connector-${connector.id}`;
-                      }}
-                    >
-                      Docs
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-white text-black hover:bg-gray-200 text-xs h-8 font-semibold"
-                      onClick={() => {
-                        setLocation(connector.connectPath);
-                      }}
-                    >
-                      Connect
-                    </Button>
+                  {/* Title & Category info */}
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-emerald-400 transition-colors duration-300">
+                      {connector.name}
+                    </h3>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mt-0.5 block">
+                      {connector.category}
+                    </span>
                   </div>
                 </div>
-              );
-            })
-          )}
+
+                {/* Docs / Connect Actions */}
+                <div className="mt-6 flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-white/5 bg-white/[0.02] text-gray-300 hover:bg-white/[0.08] hover:text-white text-xs h-8"
+                    onClick={() => {
+                      window.location.href = `/docs#connector-${connector.id}`;
+                    }}
+                  >
+                    Docs
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-white text-black hover:bg-gray-200 text-xs h-8 font-semibold"
+                    onClick={() => {
+                      setLocation(connector.connectPath);
+                    }}
+                  >
+                    Connect
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Right Arrow Button */}
@@ -1301,6 +1255,68 @@ function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading:
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
+    </div>
+  );
+}
+
+function ConnectorsPanel({ apiKeys, isLoading }: { apiKeys: APIKey[]; isLoading: boolean }) {
+  const [, setLocation] = useLocation();
+  const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
+
+  const codingPlugins = connectors.filter(c => c.group === "Plugins");
+  const mcpClients = connectors.filter(c => c.group === "MCP");
+  const knowledgeBases = connectors.filter(c => c.group === "Knowledge bases");
+  const apisAndExtensions = connectors.filter(
+    (c) => c.group === "Developer" || c.group === "Apps & extensions"
+  );
+
+  return (
+    <div className="space-y-10">
+      <style dangerouslySetInnerHTML={{__html: `
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}} />
+
+      <ConnectorRow
+        title="Coding Plugins"
+        connectorsList={codingPlugins}
+        apiKeys={apiKeys}
+        isLoading={isLoading}
+        logoErrors={logoErrors}
+        setLogoErrors={setLogoErrors}
+        setLocation={setLocation}
+      />
+
+      <ConnectorRow
+        title="MCP Clients"
+        connectorsList={mcpClients}
+        apiKeys={apiKeys}
+        isLoading={isLoading}
+        logoErrors={logoErrors}
+        setLogoErrors={setLogoErrors}
+        setLocation={setLocation}
+      />
+
+      <ConnectorRow
+        title="Knowledge Bases"
+        connectorsList={knowledgeBases}
+        apiKeys={apiKeys}
+        isLoading={isLoading}
+        logoErrors={logoErrors}
+        setLogoErrors={setLogoErrors}
+        setLocation={setLocation}
+      />
+
+      <ConnectorRow
+        title="APIs & Extensions"
+        connectorsList={apisAndExtensions}
+        apiKeys={apiKeys}
+        isLoading={isLoading}
+        logoErrors={logoErrors}
+        setLogoErrors={setLogoErrors}
+        setLocation={setLocation}
+      />
     </div>
   );
 }

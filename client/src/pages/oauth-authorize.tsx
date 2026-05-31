@@ -24,17 +24,17 @@ const API_URL = import.meta.env.VITE_XMEM_API_URL || "http://localhost:8000";
 function getClientInfo(
   clientId: string | null,
   redirectUri: string | null,
-): { name: string; icon: ComponentType<{ className?: string }>; accent: string } {
+): { name: string; icon: ComponentType<{ className?: string }> } {
   if (redirectUri?.includes('chatgpt.com') || clientId === 'xmem-mcp') {
-    return { name: 'ChatGPT', icon: SiOpenai, accent: 'from-emerald-400 to-teal-300' };
+    return { name: 'ChatGPT', icon: SiOpenai };
   }
-  return { name: clientId || 'External App', icon: Zap, accent: 'from-blue-400 to-purple-300' };
+  return { name: clientId || 'External App', icon: Zap };
 }
 
 const permissions = [
-  { icon: Brain, label: 'Read & search your memories', detail: 'Semantic search and recall' },
-  { icon: BookOpen, label: 'Save new memories', detail: 'Ingest conversations and context' },
-  { icon: Code2, label: 'Access code indexes', detail: 'Query scanned repositories' },
+  { label: 'Read & search your memories', detail: 'Semantic search and recall' },
+  { label: 'Save new memories', detail: 'Ingest conversations and context' },
+  { label: 'Access code indexes', detail: 'Query scanned repositories' },
 ];
 
 export default function OAuthAuthorize() {
@@ -115,14 +115,17 @@ export default function OAuthAuthorize() {
     }
   };
 
+  const clientLogo = (clientId === 'xmem-mcp' || redirectUri?.includes('chatgpt.com'))
+    ? '/connector_logos/chatgpt.png'
+    : null;
+
   return (
     <div className="min-h-screen bg-[#080808] text-white">
       <Navbar />
 
       {/* ── Subtle background glow ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-1/3 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.04] blur-[120px]" />
-        <div className="absolute left-1/3 top-2/3 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-500/[0.03] blur-[100px]" />
+        <div className="absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.01] blur-[120px]" />
       </div>
 
       <div className="relative flex min-h-screen items-center justify-center px-4 pt-20 pb-12">
@@ -130,10 +133,12 @@ export default function OAuthAuthorize() {
           {/* ── Connection visual ── */}
           <div className="mb-8 flex items-center justify-center gap-6">
             {/* Requesting app */}
-            <div
-              className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${clientInfo.accent} shadow-lg shadow-emerald-500/10`}
-            >
-              <ClientIcon className="h-8 w-8 text-black" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/5 bg-[#151515] overflow-hidden shadow-lg shadow-black/20">
+              {clientLogo ? (
+                <img src={clientLogo} alt={clientInfo.name} className="h-10 w-10 object-contain" />
+              ) : (
+                <ClientIcon className="h-8 w-8 text-white" />
+              )}
             </div>
 
             {/* Animated dots */}
@@ -141,19 +146,19 @@ export default function OAuthAuthorize() {
               {[0, 150, 300].map((delay) => (
                 <div
                   key={delay}
-                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400/60"
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-white/30"
                   style={{ animationDelay: `${delay}ms` }}
                 />
               ))}
             </div>
 
             {/* XMem */}
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-lg">
-              <img src="/logo.png" alt="XMem" className="h-8 w-8 invert" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/5 bg-[#151515] overflow-hidden shadow-lg shadow-black/20">
+              <img src="/logo.png" alt="XMem" className="h-8 w-auto invert" />
             </div>
           </div>
 
-          <h1 className="mb-2 text-center text-2xl font-bold text-white">
+          <h1 className="mb-2 text-center text-2xl font-bold text-white tracking-tight">
             Authorize {clientInfo.name}
           </h1>
           <p className="mb-8 text-center text-sm text-gray-400">
@@ -161,9 +166,9 @@ export default function OAuthAuthorize() {
           </p>
 
           {/* ── Main card ── */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="rounded-2xl border border-white/5 bg-[#0d0d0d] p-6 shadow-2xl shadow-black/35 backdrop-blur-xl">
             {/* Signed-in user */}
-            <div className="mb-6 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="mb-6 flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3">
               {user?.picture ? (
                 <img
                   src={user.picture}
@@ -187,19 +192,13 @@ export default function OAuthAuthorize() {
                 Permissions requested
               </p>
               {permissions.map((perm) => {
-                const PermIcon = perm.icon;
                 return (
                   <div
                     key={perm.label}
-                    className="flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-white/[0.03]"
+                    className="rounded-lg py-2 px-1 transition-colors hover:bg-white/[0.02]"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
-                      <PermIcon className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">{perm.label}</p>
-                      <p className="text-xs text-gray-500">{perm.detail}</p>
-                    </div>
+                    <p className="text-sm font-medium text-white">{perm.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{perm.detail}</p>
                   </div>
                 );
               })}
@@ -216,7 +215,7 @@ export default function OAuthAuthorize() {
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                className="flex-1 border-white/10 bg-transparent text-gray-300 hover:bg-white/[0.06] hover:text-white"
+                className="flex-1 border-white/5 bg-transparent text-gray-300 hover:bg-white/[0.06] hover:text-white"
                 onClick={() => setLocation('/dashboard')}
                 disabled={isLoading}
               >
@@ -225,7 +224,7 @@ export default function OAuthAuthorize() {
               <Button
                 onClick={handleApprove}
                 disabled={isLoading}
-                className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 font-semibold text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-500 hover:to-teal-500"
+                className="flex-1 bg-white text-black font-semibold hover:bg-gray-200 shadow-md transition-all duration-300"
               >
                 {isLoading ? (
                   <>
