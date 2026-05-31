@@ -519,6 +519,25 @@ export default function Dashboard() {
         theme: {
           color: "#0f172a",
         },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay using UPI",
+                instruments: [
+                  { method: "upi" },
+                  { method: "card" },
+                  { method: "netbanking" },
+                  { method: "wallet" }
+                ],
+              },
+            },
+            sequence: ["block.upi"],
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
+        },
         handler: (payment) => {
           void verifyRazorpayPayment(payment, selectedPackage, order);
         },
@@ -1648,8 +1667,8 @@ function BillingPanel({
                 "Python and TypeScript SDKs included",
                 "No credit card required",
               ]}
-              actionLabel="Current plan"
-              disabled
+              actionLabel={billingSummary.plan_name === "Free" || billingSummary.plan_name === "Free trial" ? "Current plan" : "Free Plan"}
+              disabled={true}
             />
 
             <PlanCard
@@ -1663,10 +1682,16 @@ function BillingPanel({
                 "24/7 customer support",
                 "Access to exclusive features coming soon",
               ]}
-              actionLabel={billingPackageId === proPlan.id ? "Processing" : "Start Pro"}
+              actionLabel={
+                billingSummary.plan_name === "Pro"
+                  ? "Current plan"
+                  : billingPackageId === proPlan.id
+                  ? "Processing"
+                  : "Start Pro"
+              }
               loading={billingPackageId === proPlan.id}
-              disabled={!!billingPackageId}
-              highlighted
+              disabled={!!billingPackageId || billingSummary.plan_name === "Pro"}
+              highlighted={billingSummary.plan_name !== "Pro"}
               onAction={() => onBuyCredits(proPlan)}
             />
 
