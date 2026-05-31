@@ -525,10 +525,9 @@ export default function Dashboard() {
               upi: {
                 name: "Pay using UPI",
                 instruments: [
-                  { method: "upi" },
-                  { method: "card" },
-                  { method: "netbanking" },
-                  { method: "wallet" }
+                  {
+                    method: "upi",
+                  },
                 ],
               },
             },
