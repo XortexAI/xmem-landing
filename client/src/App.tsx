@@ -11,11 +11,11 @@ import { Loader2 } from "lucide-react";
 // Eagerly loaded — always needed on first visit
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
 
 // Lazy-loaded pages — split into separate chunks
 const Scanner = React.lazy(() => import("@/pages/scanner"));
 const ContextImporter = React.lazy(() => import("@/pages/context"));
-const Login = React.lazy(() => import("@/pages/login"));
 const Dashboard = React.lazy(() => import("@/pages/dashboard"));
 const SetUsername = React.lazy(() => import("@/pages/set-username"));
 const DocsPage = React.lazy(() => import("@/pages/docs"));
@@ -38,8 +38,49 @@ function PageLoader() {
   );
 }
 
+// Error boundary to catch chunk-load failures (network errors, CDN hash mismatches)
+// and show a retry UI instead of an unrecoverable white screen.
+class ChunkErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-background">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <p className="text-lg font-semibold text-foreground">
+              Something went wrong while loading this page.
+            </p>
+            <p className="text-muted-foreground">
+              This may be due to a network issue. Please try again.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function Router() {
   return (
+    <ChunkErrorBoundary>
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/" component={Home} />
@@ -97,6 +138,7 @@ function Router() {
         <Route component={NotFound} />
       </Switch>
     </Suspense>
+    </ChunkErrorBoundary>
   );
 }
 
