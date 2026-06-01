@@ -653,6 +653,39 @@ function SecuritySection() {
   );
 }
 
+function CTASection() {
+  return (
+    <section className="bg-[#b8ff65] px-5 py-20 text-black sm:px-8">
+      <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
+            Stop resetting your agents to zero.
+          </h2>
+          <p className="mt-5 max-w-3xl text-base leading-8 text-black/70 sm:text-lg">
+            Give your next coding assistant, support bot, or research agent a memory layer it can carry across sessions.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/scanner"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-semibold text-white transition hover:bg-black/85"
+          >
+            Start building
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/docs"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-black/20 bg-transparent px-5 text-sm font-semibold text-black transition hover:bg-black/10"
+          >
+            Read docs
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   return (
     <div className="dark min-h-screen bg-[#050505] text-white">
@@ -666,6 +699,7 @@ export default function Home() {
         <DeveloperSection />
         <SecuritySection />
         <PricingSection />
+        <CTASection />
       </main>
       <Footer />
     </div>
