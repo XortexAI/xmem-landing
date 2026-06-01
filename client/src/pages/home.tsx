@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useState } from "react";
 import {
   ArrowRight,
   ChevronRight,
@@ -189,6 +190,15 @@ function HeroBackdrop() {
 }
 
 function HeroSection() {
+  const installCommand = "npx create-xmem@latest";
+  const [copiedInstallCommand, setCopiedInstallCommand] = useState(false);
+
+  const copyInstallCommand = async () => {
+    await navigator.clipboard.writeText(installCommand);
+    setCopiedInstallCommand(true);
+    window.setTimeout(() => setCopiedInstallCommand(false), 1600);
+  };
+
   return (
     <section className="relative flex min-h-[92svh] items-center overflow-hidden bg-[#050805] px-5 pb-12 pt-28 text-white sm:px-8">
       <HeroBackdrop />
@@ -230,8 +240,14 @@ function HeroSection() {
 
         <div className="mt-4 inline-flex max-w-full items-center gap-3 rounded-md border border-white/20 bg-black/[0.55] px-4 py-3 font-mono text-sm text-white/80 shadow-2xl shadow-black/40 backdrop-blur-md">
           <span className="text-white/40">$</span>
-          <span>npx create-xmem@latest</span>
-          <span className="ml-2 rounded-sm border border-white/10 px-1.5 py-0.5 text-xs text-white/40">copy</span>
+          <span>{installCommand}</span>
+          <button
+            type="button"
+            onClick={copyInstallCommand}
+            className="ml-2 rounded-sm border border-white/10 px-1.5 py-0.5 text-xs text-white/50 transition hover:border-white/25 hover:text-white"
+          >
+            {copiedInstallCommand ? "copied" : "copy"}
+          </button>
         </div>
 
         <div className="mt-12 flex w-full max-w-4xl flex-wrap items-center justify-center gap-x-10 gap-y-4 text-sm font-semibold text-white/[0.42] sm:text-base">
@@ -247,7 +263,8 @@ function HeroSection() {
 }
 
 function BenchmarkSection() {
-  const activeBenchmark = benchmarkSets[0];
+  const [activeBenchmarkIndex, setActiveBenchmarkIndex] = useState(0);
+  const activeBenchmark = benchmarkSets[activeBenchmarkIndex];
 
   return (
     <section id="benchmarks" className="relative overflow-hidden bg-[#050805] px-5 py-24 text-white sm:px-8">
@@ -264,15 +281,18 @@ function BenchmarkSection() {
 
         <div className="mt-12 grid gap-5 rounded-lg border border-[#1f6f42]/45 bg-[#061009]/80 p-4 shadow-2xl shadow-black/50 backdrop-blur-md lg:grid-cols-[280px_1fr] lg:p-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            {benchmarkSets.map((benchmark) => (
-              <div
+            {benchmarkSets.map((benchmark, index) => (
+              <button
+                type="button"
                 key={benchmark.name}
-                className={`rounded-md border p-5 ${benchmark.name === activeBenchmark.name ? "border-[#24d46f]/45 bg-[#112319]" : "border-white/10 bg-white/[0.035]"}`}
+                onClick={() => setActiveBenchmarkIndex(index)}
+                aria-pressed={index === activeBenchmarkIndex}
+                className={`rounded-md border p-5 text-left transition hover:border-[#24d46f]/35 ${index === activeBenchmarkIndex ? "border-[#24d46f]/45 bg-[#112319]" : "border-white/10 bg-white/[0.035]"}`}
               >
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-white/[0.42]">{benchmark.eyebrow}</div>
                 <div className="mt-3 font-display text-2xl font-semibold text-white/[0.78]">{benchmark.name}</div>
                 <div className="mt-2 font-display text-6xl font-semibold leading-none text-[#18b956]">{benchmark.score}</div>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -616,39 +636,6 @@ function SecuritySection() {
               <p className="mt-3 text-sm leading-7 text-white/55">{copy}</p>
             </div>
           ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CTASection() {
-  return (
-    <section className="bg-[#b8ff65] px-5 py-20 text-black sm:px-8">
-      <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
-        <div>
-          <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
-            Stop resetting your agents to zero.
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-8 text-black/70">
-            Give your next coding assistant, support bot, or research agent a memory layer it can carry across sessions.
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/scanner"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-semibold text-white transition hover:bg-black/85"
-          >
-            Start building
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/docs"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-black/20 bg-transparent px-5 text-sm font-semibold text-black transition hover:bg-black/10"
-          >
-            Read docs
-            <ChevronRight className="h-4 w-4" />
-          </Link>
         </div>
       </div>
     </section>
