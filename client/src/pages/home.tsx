@@ -179,12 +179,12 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function HeroBackdrop() {
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      <div className="absolute inset-0 xmem-grid opacity-35" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(50,205,115,0.22),transparent_28%),linear-gradient(180deg,#050805_0%,#050805_58%,#021008_100%)]" />
+      <div className="absolute inset-0 xmem-grid opacity-45" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(184,255,101,0.17),transparent_30%),linear-gradient(180deg,#050505_0%,#050505_58%,#071008_100%)]" />
       <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
-      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#020503] via-[#020503]/70 to-transparent" />
-      <div className="absolute bottom-0 left-1/2 h-[360px] w-[130vw] -translate-x-1/2 origin-bottom skew-x-[-8deg] bg-[radial-gradient(circle,rgba(38,255,135,0.38)_1px,transparent_1.7px)] bg-[length:16px_16px] opacity-60 [mask-image:linear-gradient(to_top,black,transparent_88%)]" />
-      <div className="absolute bottom-0 left-1/2 h-[360px] w-[130vw] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(38,255,135,0.20),transparent_62%)]" />
+      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#050505] via-[#050505]/70 to-transparent" />
+      <div className="absolute bottom-0 left-1/2 h-[360px] w-[130vw] -translate-x-1/2 origin-bottom skew-x-[-8deg] bg-[radial-gradient(circle,rgba(184,255,101,0.34)_1px,transparent_1.7px)] bg-[length:16px_16px] opacity-60 [mask-image:linear-gradient(to_top,black,transparent_88%)]" />
+      <div className="absolute bottom-0 left-1/2 h-[360px] w-[130vw] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(184,255,101,0.16),transparent_62%)]" />
     </div>
   );
 }
@@ -200,18 +200,18 @@ function HeroSection() {
   };
 
   return (
-    <section className="relative flex min-h-[92svh] items-center overflow-hidden bg-[#050805] px-5 pb-12 pt-28 text-white sm:px-8">
+    <section className="relative flex min-h-[92svh] items-center overflow-hidden bg-[#050505] px-5 pb-12 pt-28 text-white sm:px-8">
       <HeroBackdrop />
 
       <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center text-center">
-        <div className="mb-6 inline-flex rounded-full border border-[#2bdc7a]/30 bg-[#2bdc7a]/10 px-3 py-1 text-xs font-semibold text-[#7dffad] shadow-[0_0_36px_rgba(43,220,122,0.18)]">
-          Memory as a Service
+        <div className="mb-6 inline-flex rounded-full border border-[#b8ff65]/30 bg-[#b8ff65]/10 px-3 py-1 text-xs font-semibold text-[#dfffaa] shadow-[0_0_36px_rgba(184,255,101,0.14)]">
+          Open-source memory infrastructure
         </div>
 
         <h1 className="w-full max-w-5xl break-words font-display text-5xl font-semibold leading-[0.96] text-white sm:text-7xl lg:text-8xl">
           Persistent memory
           <span className="block">
-            for <span className="bg-gradient-to-r from-[#75e4ac] via-[#32d27f] to-[#b8ff65] bg-clip-text text-transparent">AI agents.</span>
+            for <span className="bg-gradient-to-r from-[#dfffaa] via-[#b8ff65] to-[#3dd8ff] bg-clip-text text-transparent">AI agents.</span>
           </span>
         </h1>
 
@@ -223,9 +223,9 @@ function HeroSection() {
           <Link
             href="/scanner"
             data-testid="button-start-building"
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-white px-5 text-sm font-semibold text-black shadow-[0_0_40px_rgba(255,255,255,0.12)] transition hover:bg-[#d9ff9b] sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#b8ff65] px-5 text-sm font-semibold text-black shadow-[0_0_40px_rgba(184,255,101,0.16)] transition hover:bg-[#d9ff9b] sm:w-auto"
           >
-            Dashboard
+            Start building
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
@@ -267,19 +267,24 @@ function BenchmarkSection() {
   const activeBenchmark = benchmarkSets[activeBenchmarkIndex];
 
   return (
-    <section id="benchmarks" className="relative overflow-hidden bg-[#050805] px-5 py-24 text-white sm:px-8">
+    <section id="benchmarks" className="relative overflow-hidden bg-[#050505] px-5 py-24 text-white sm:px-8">
       <div className="absolute inset-0 xmem-grid opacity-25" aria-hidden="true" />
-      <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_50%_0%,rgba(43,220,122,0.16),transparent_55%)]" aria-hidden="true" />
+      <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_50%_0%,rgba(184,255,101,0.12),transparent_55%)]" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-7xl">
-        <div className="mx-auto max-w-4xl text-center">
-          <h2 className="font-display text-5xl font-semibold leading-tight text-white sm:text-6xl lg:text-7xl">
-            Proof, not promises.
-          </h2>
-          <div className="mx-auto mt-5 h-2 w-2 rounded-full bg-[#2bdc7a] shadow-[0_0_28px_rgba(43,220,122,0.8)]" />
+        <div className="grid gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
+          <div>
+            <SectionLabel>Benchmarks</SectionLabel>
+            <h2 className="font-display text-4xl font-semibold leading-tight text-white sm:text-5xl">
+              Proof that memory survives more than one chat.
+            </h2>
+          </div>
+          <p className="max-w-2xl text-base leading-8 text-white/60 lg:justify-self-end">
+            Use the benchmark view as evidence, not decoration: compare recall quality across long-term and conversational memory tasks before wiring XMem into production agents.
+          </p>
         </div>
 
-        <div className="mt-12 grid gap-5 rounded-lg border border-[#1f6f42]/45 bg-[#061009]/80 p-4 shadow-2xl shadow-black/50 backdrop-blur-md lg:grid-cols-[280px_1fr] lg:p-5">
+        <div className="mt-12 grid gap-5 rounded-md border border-white/10 bg-[#090a09]/90 p-4 shadow-2xl shadow-black/50 backdrop-blur-md lg:grid-cols-[280px_1fr] lg:p-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             {benchmarkSets.map((benchmark, index) => (
               <button
@@ -287,16 +292,16 @@ function BenchmarkSection() {
                 key={benchmark.name}
                 onClick={() => setActiveBenchmarkIndex(index)}
                 aria-pressed={index === activeBenchmarkIndex}
-                className={`rounded-md border p-5 text-left transition hover:border-[#24d46f]/35 ${index === activeBenchmarkIndex ? "border-[#24d46f]/45 bg-[#112319]" : "border-white/10 bg-white/[0.035]"}`}
+                className={`rounded-md border p-5 text-left transition hover:border-[#b8ff65]/35 ${index === activeBenchmarkIndex ? "border-[#b8ff65]/45 bg-[#b8ff65]/[0.055]" : "border-white/10 bg-white/[0.035]"}`}
               >
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-white/[0.42]">{benchmark.eyebrow}</div>
                 <div className="mt-3 font-display text-2xl font-semibold text-white/[0.78]">{benchmark.name}</div>
-                <div className="mt-2 font-display text-6xl font-semibold leading-none text-[#18b956]">{benchmark.score}</div>
+                <div className="mt-2 font-display text-6xl font-semibold leading-none text-[#b8ff65]">{benchmark.score}</div>
               </button>
             ))}
           </div>
 
-          <div className="rounded-md border border-white/10 bg-[#061008]">
+          <div className="rounded-md border border-white/10 bg-[#050505]">
             <div className="grid gap-5 border-b border-white/10 p-5 md:grid-cols-[1fr_auto] md:items-start">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-white/[0.42]">{activeBenchmark.eyebrow}</div>
@@ -304,7 +309,7 @@ function BenchmarkSection() {
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-white/[0.56]">{activeBenchmark.summary}</p>
               </div>
               <div className="text-left md:text-right">
-                <div className="font-display text-6xl font-semibold leading-none text-[#18b956]">{activeBenchmark.score}</div>
+                <div className="font-display text-6xl font-semibold leading-none text-[#b8ff65]">{activeBenchmark.score}</div>
                 <div className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/[0.46]">average score</div>
               </div>
             </div>
@@ -313,7 +318,7 @@ function BenchmarkSection() {
               <div className="mb-5 flex flex-wrap gap-4 text-xs text-white/45">
                 {["Zep", "Membase", "Supermemory", "Backboard"].map((peer) => (
                   <span key={peer} className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-[#18b956]" />
+                    <span className="h-2 w-2 rounded-full bg-[#b8ff65]" />
                     {peer}
                   </span>
                 ))}
@@ -322,9 +327,9 @@ function BenchmarkSection() {
               {activeBenchmark.rows.map(([label, value, note]) => (
                 <div key={label} className="grid gap-3 border-t border-white/[0.06] py-3 text-sm md:grid-cols-[190px_48px_1fr_170px] md:items-center">
                   <div className="font-semibold text-white/[0.74]">{label}</div>
-                  <div className="font-mono text-xs text-[#2bdc7a]">{value}</div>
+                  <div className="font-mono text-xs text-[#b8ff65]">{value}</div>
                   <div className="h-2 rounded-full bg-white/[0.06]">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#0d6c35] to-[#39e17e] shadow-[0_0_18px_rgba(43,220,122,0.42)]" style={{ width: `${value}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#4f7c2f] to-[#b8ff65] shadow-[0_0_18px_rgba(184,255,101,0.34)]" style={{ width: `${value}%` }} />
                   </div>
                   <div className="text-xs leading-5 text-white/[0.48]">{note}</div>
                 </div>
@@ -339,44 +344,45 @@ function BenchmarkSection() {
 
 function PricingSection() {
   return (
-    <section id="pricing" className="relative overflow-hidden bg-[#050805] px-5 py-24 text-white sm:px-8">
-      <div className="absolute inset-0 xmem-grid opacity-20" aria-hidden="true" />
-      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_50%_0%,rgba(43,220,122,0.18),transparent_58%)]" aria-hidden="true" />
-
-      <div className="relative mx-auto max-w-7xl">
-        <div className="mx-auto max-w-4xl text-center">
-          <h2 className="font-display text-5xl font-semibold leading-tight text-white sm:text-6xl lg:text-7xl">
-            Start free.
-            <span className="block bg-gradient-to-r from-[#9beec5] via-[#2bdc7a] to-[#9ff46a] bg-clip-text text-transparent">
-              $1 when you go live.
-            </span>
-          </h2>
-          <div className="mx-auto mt-6 h-2 w-2 rounded-full bg-[#2bdc7a] shadow-[0_0_28px_rgba(43,220,122,0.8)]" />
+    <section id="pricing" className="bg-[#f5f1e8] px-5 py-24 text-black sm:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
+          <div>
+            <div className="mb-4 inline-flex rounded-sm border border-black/10 bg-black/[0.04] px-3 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-black/55">
+              Pricing
+            </div>
+            <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
+              Start free. Go live when memory becomes core.
+            </h2>
+          </div>
+          <p className="max-w-2xl text-base leading-8 text-black/60 lg:justify-self-end">
+            Keep experimentation free while teams validate the workflow, then move to a simple production tier when agents need persistent recall at higher volume.
+          </p>
         </div>
 
-        <div className="mt-12 grid overflow-hidden rounded-lg border border-[#1f6f42]/45 bg-[#061009]/80 shadow-2xl shadow-black/50 backdrop-blur-md lg:grid-cols-3">
+        <div className="mt-12 grid overflow-hidden rounded-md border border-black/10 bg-black/10 lg:grid-cols-3">
           {pricingPlans.map((plan) => (
             <article
               key={plan.name}
-              className={`relative flex min-h-[520px] flex-col border-b border-white/10 p-6 last:border-b-0 lg:border-b-0 lg:border-r last:lg:border-r-0 ${plan.featured ? "bg-[#0b1f13] shadow-[inset_0_2px_0_#41ee8b]" : "bg-black/10"}`}
+              className={`relative flex min-h-[500px] flex-col border-b border-black/10 p-6 last:border-b-0 lg:border-b-0 lg:border-r last:lg:border-r-0 ${plan.featured ? "bg-[#111] text-white shadow-[inset_0_2px_0_#b8ff65]" : "bg-[#fbf8f0] text-black"}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="font-display text-2xl font-semibold">{plan.name}</h3>
-                  <p className="mt-2 min-h-[42px] text-sm leading-6 text-white/[0.52]">{plan.summary}</p>
+                  <p className={`mt-2 min-h-[42px] text-sm leading-6 ${plan.featured ? "text-white/55" : "text-black/58"}`}>{plan.summary}</p>
                 </div>
                 {plan.featured ? (
-                  <span className="rounded-full bg-[#2bdc7a]/15 px-3 py-1 text-xs font-semibold text-[#7dffad]">Recommended</span>
+                  <span className="rounded-full bg-[#b8ff65]/15 px-3 py-1 text-xs font-semibold text-[#dfffaa]">Recommended</span>
                 ) : null}
               </div>
 
               <div className="mt-10 font-display text-6xl font-semibold leading-none">{plan.price}</div>
-              <div className="mt-5 text-sm font-semibold text-white">{plan.note}</div>
+              <div className={`mt-5 text-sm font-semibold ${plan.featured ? "text-white" : "text-black"}`}>{plan.note}</div>
 
-              <ul className="mt-5 space-y-3 text-sm leading-6 text-white/[0.58]">
+              <ul className={`mt-5 space-y-3 text-sm leading-6 ${plan.featured ? "text-white/58" : "text-black/60"}`}>
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex gap-3">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-[#2bdc7a]" />
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-[#b8ff65]" />
                     {feature}
                   </li>
                 ))}
@@ -386,7 +392,7 @@ function PricingSection() {
                 {plan.href.startsWith("/") ? (
                   <Link
                     href={plan.href}
-                    className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition ${plan.featured ? "bg-[#2bdc7a] text-black hover:bg-[#7dffad]" : "border border-white/15 bg-black/30 text-white hover:border-white/25 hover:bg-white/[0.07]"}`}
+                    className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition ${plan.featured ? "bg-[#b8ff65] text-black hover:bg-[#d9ff9b]" : "border border-black/15 bg-transparent text-black hover:bg-black/5"}`}
                   >
                     {plan.cta}
                     {plan.featured ? <ArrowRight className="h-4 w-4" /> : null}
@@ -394,7 +400,7 @@ function PricingSection() {
                 ) : (
                   <a
                     href={plan.href}
-                    className="inline-flex h-12 w-full items-center justify-center rounded-md border border-white/15 bg-black/30 px-5 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.07]"
+                    className="inline-flex h-12 w-full items-center justify-center rounded-md border border-black/15 bg-transparent px-5 text-sm font-semibold text-black transition hover:bg-black/5"
                   >
                     {plan.cta}
                   </a>
@@ -648,13 +654,13 @@ export default function Home() {
       <Navbar />
       <main>
         <HeroSection />
-        <BenchmarkSection />
-        <PricingSection />
         <PrimitiveSection />
         <StackComparisonSection />
+        <BenchmarkSection />
         <DemoSection />
         <DeveloperSection />
         <SecuritySection />
+        <PricingSection />
       </main>
       <Footer />
     </div>
