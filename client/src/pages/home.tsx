@@ -2,28 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
   ArrowRight,
-  BadgeCheck,
-  BrainCircuit,
-  Check,
   ChevronRight,
-  Code2,
-  DatabaseZap,
-  FileSearch,
-  GitBranch,
-  Github,
-  KeyRound,
-  Layers3,
-  LockKeyhole,
-  Network,
-  PlugZap,
-  Radar,
-  ScanSearch,
-  ShieldCheck,
-  Sparkles,
-  TerminalSquare,
-  Workflow,
-  X,
-  Zap,
 } from "lucide-react";
 import { Navbar } from "../sections/Navbar";
 import { Footer } from "../sections/Footer";
@@ -33,37 +12,31 @@ const primitives = [
     eyebrow: "01",
     title: "Persistent Memory",
     copy: "Store preferences, project context, decisions, snippets, and temporal events as durable memory objects.",
-    icon: BrainCircuit,
   },
   {
     eyebrow: "02",
     title: "Judge Before Write",
     copy: "Classify, merge, contradict, and promote memories before they pollute your agent context.",
-    icon: ShieldCheck,
   },
   {
     eyebrow: "03",
     title: "Codebase Scanner",
     copy: "Index repositories into queryable code memory so assistants answer with source-aware context.",
-    icon: ScanSearch,
   },
   {
     eyebrow: "04",
     title: "Context Importer",
     copy: "Turn shared AI chats, notes, and long conversations into reusable memory for every next session.",
-    icon: FileSearch,
   },
   {
     eyebrow: "05",
     title: "MCP Ready",
     copy: "Bring memory into Claude, Cursor, Codex, OpenCode, browser workflows, and custom agent runtimes.",
-    icon: PlugZap,
   },
   {
     eyebrow: "06",
     title: "Memory Domains",
     copy: "Profile, temporal, summary, code, and snippet domains keep retrieval precise instead of mushy.",
-    icon: Layers3,
   },
 ];
 
@@ -97,22 +70,18 @@ const useCases = [
   {
     title: "Coding agents",
     copy: "Remember repo architecture, implementation decisions, TODOs, and the user's preferred review style.",
-    icon: Code2,
   },
   {
     title: "Research assistants",
     copy: "Carry source trails, entities, claims, and open questions across long-running investigations.",
-    icon: Radar,
   },
   {
     title: "Support copilots",
     copy: "Recall customer preferences, account state, prior resolutions, and unresolved blockers.",
-    icon: BadgeCheck,
   },
   {
     title: "Personal AI stacks",
     copy: "Share a coherent memory across ChatGPT, Claude, Cursor, Codex, and your own tools.",
-    icon: Network,
   },
 ];
 
@@ -123,78 +92,96 @@ const metrics = [
   ["OSS", "developer owned"],
 ];
 
-function SectionLabel({
-  children,
-  icon: Icon,
-}: {
-  children: React.ReactNode;
-  icon: typeof BrainCircuit;
-}) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-4 inline-flex items-center gap-2 rounded-sm border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/60">
-      <Icon className="h-3.5 w-3.5 text-[#b8ff65]" />
+    <div className="mb-4 inline-flex rounded-sm border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-white/55">
       {children}
     </div>
   );
 }
 
 function HeroMemoryMap() {
-  const nodes = [
-    ["Profile", "left-[8%] top-[20%]", "border-[#b8ff65]/45 text-[#dfffaa]"],
-    ["Code", "left-[18%] bottom-[19%]", "border-[#3dd8ff]/45 text-[#aeeeff]"],
-    ["Temporal", "right-[11%] top-[23%]", "border-[#ff6b4a]/45 text-[#ffc0b2]"],
-    ["Summary", "right-[20%] bottom-[18%]", "border-white/25 text-white/70"],
-    ["MCP", "left-[45%] top-[12%]", "border-[#f7d56d]/45 text-[#ffe8a6]"],
+  const memoryLines = [
+    ["profile", "Prefers terse PR notes and direct implementation."],
+    ["code", "Scanner route uses repository-aware retrieval."],
+    ["temporal", "Deprecate stale onboarding steps after release."],
+    ["summary", "Current project: landing-page polish for merge."],
   ];
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      <div className="absolute inset-0 xmem-grid opacity-70" />
-      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#050505] to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#050505] to-transparent" />
-
-      <div className="absolute left-1/2 top-[46%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
-      <div className="absolute left-1/2 top-[46%] h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/10" />
-      <div className="absolute left-1/2 top-[46%] h-[186px] w-[186px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15 bg-black/60" />
-
-      <div className="absolute left-1/2 top-[46%] h-px w-[74vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-      <div className="absolute left-1/2 top-[46%] h-[62vh] w-px -translate-x-1/2 -translate-y-1/2 bg-gradient-to-b from-transparent via-white/15 to-transparent" />
-      <div className="absolute left-1/2 top-[46%] h-px w-[66vw] -translate-x-1/2 rotate-[24deg] bg-gradient-to-r from-transparent via-[#b8ff65]/25 to-transparent" />
-      <div className="absolute left-1/2 top-[46%] h-px w-[66vw] -translate-x-1/2 -rotate-[24deg] bg-gradient-to-r from-transparent via-[#3dd8ff]/20 to-transparent" />
+      <div className="absolute inset-0 xmem-grid opacity-45" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(184,255,101,0.18),transparent_31%),linear-gradient(180deg,rgba(5,5,5,0.24),#050505_86%)]" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#050505] to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#050505] to-transparent" />
 
       <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 44, repeat: Infinity, ease: "linear" }}
-        className="absolute left-1/2 top-[46%] h-[430px] w-[430px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#b8ff65]/20"
-      />
+        animate={{ y: [0, -10, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-1/2 top-[45%] hidden w-[min(92vw,1050px)] -translate-x-1/2 -translate-y-1/2 opacity-80 lg:block"
+      >
+        <div className="grid grid-cols-[0.9fr_1.2fr_0.9fr] gap-4">
+          <div className="space-y-4 pt-16">
+            <div className="rounded-md border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/[0.35]">ingest</div>
+              <div className="mt-4 space-y-3">
+                {["repo scan", "chat import", "browser note"].map((item) => (
+                  <div key={item} className="flex items-center justify-between border-b border-white/[0.08] pb-2 text-sm text-white/[0.65]">
+                    <span>{item}</span>
+                    <span className="text-[#b8ff65]/80">queued</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="ml-10 h-px bg-gradient-to-r from-transparent via-[#b8ff65]/40 to-transparent" />
+          </div>
 
-      {nodes.map(([label, position, color]) => (
-        <motion.div
-          key={label}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className={`absolute ${position} hidden rounded-sm border bg-black/70 px-3 py-2 text-xs font-medium shadow-2xl backdrop-blur-md md:block ${color}`}
-        >
-          {label}
-        </motion.div>
-      ))}
+          <div className="rounded-md border border-[#b8ff65]/25 bg-[#070907]/70 p-5 shadow-2xl shadow-black/50 backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 text-xs uppercase tracking-[0.18em] text-white/[0.35]">
+              <span>memory plane</span>
+              <span className="text-[#b8ff65]">live</span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {memoryLines.map(([domain, copy]) => (
+                <div key={domain} className="grid grid-cols-[84px_1fr] gap-4 rounded-sm border border-white/[0.08] bg-white/[0.035] px-4 py-3 text-sm">
+                  <span className="font-mono text-[#b8ff65]/80">{domain}</span>
+                  <span className="text-white/[0.68]">{copy}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3 text-center text-xs uppercase tracking-[0.14em] text-white/[0.38]">
+              <div className="rounded-sm border border-white/[0.08] bg-black/[0.35] py-3">judge</div>
+              <div className="rounded-sm border border-white/[0.08] bg-black/[0.35] py-3">merge</div>
+              <div className="rounded-sm border border-white/[0.08] bg-black/[0.35] py-3">recall</div>
+            </div>
+          </div>
 
-      <div className="absolute left-1/2 top-[46%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/15 bg-[#080808]/70 shadow-2xl shadow-black" />
+          <div className="space-y-4 pt-24">
+            <div className="mr-10 h-px bg-gradient-to-r from-transparent via-[#3dd8ff]/[0.35] to-transparent" />
+            <div className="rounded-md border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/[0.35]">serve</div>
+              <div className="mt-4 space-y-3 text-sm text-white/[0.65]">
+                <div className="rounded-sm bg-white/[0.04] px-3 py-2">Codex</div>
+                <div className="rounded-sm bg-white/[0.04] px-3 py-2">Cursor</div>
+                <div className="rounded-sm bg-white/[0.04] px-3 py-2">Claude via MCP</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
 
 function HeroSection() {
   return (
-    <section className="relative flex min-h-[92svh] items-center overflow-hidden bg-[#050505] px-5 pb-20 pt-28 text-white sm:px-8">
+    <section className="relative flex min-h-[92svh] items-center overflow-hidden bg-[#050505] px-5 pb-16 pt-28 text-white sm:px-8">
       <HeroMemoryMap />
 
       <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center text-center">
         <div
-          className="mb-5 inline-flex max-w-[18rem] items-center gap-2 rounded-sm border border-[#b8ff65]/25 bg-[#b8ff65]/10 px-3 py-1.5 text-center text-sm font-medium leading-5 text-[#dfffaa] sm:max-w-none"
+          className="mb-5 inline-flex max-w-[18rem] rounded-sm border border-[#b8ff65]/25 bg-[#b8ff65]/10 px-3 py-1.5 text-center text-sm font-medium leading-5 text-[#dfffaa] sm:max-w-none"
         >
-          <Sparkles className="h-4 w-4" />
           Open-source memory infrastructure for agents
         </div>
 
@@ -202,8 +189,8 @@ function HeroSection() {
           className="w-full max-w-5xl break-words font-display font-semibold leading-none text-white"
         >
           <span className="block text-4xl sm:text-7xl lg:text-8xl">XMem</span>
-          <span className="mx-auto mt-3 block max-w-[9ch] text-4xl text-white/62 sm:max-w-none sm:text-6xl lg:text-7xl">
-            gives every agent a past.
+          <span className="mx-auto mt-3 block max-w-[10ch] text-4xl text-white/[0.62] sm:max-w-none sm:text-6xl lg:text-7xl">
+            memory that follows every agent.
           </span>
         </h1>
 
@@ -233,13 +220,12 @@ function HeroSection() {
             <ChevronRight className="h-4 w-4" />
           </Link>
           <a
-            href="https://github.com/XortexAI/XMem"
+            href="https://github.com/XortexAI/Xmem"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-white/15 bg-black/40 px-5 text-sm font-semibold text-white/80 transition hover:border-white/25 hover:text-white sm:w-auto"
           >
-            <Github className="h-4 w-4" />
-            GitHub
+            View GitHub
           </a>
         </div>
 
@@ -291,7 +277,6 @@ function PrimitiveSection() {
         <div className="grid gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:items-end">
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-sm border border-black/10 bg-black/[0.04] px-3 py-1.5 text-xs font-medium text-black/60">
-              <DatabaseZap className="h-3.5 w-3.5 text-[#236b4a]" />
               Product primitives
             </div>
             <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
@@ -299,18 +284,16 @@ function PrimitiveSection() {
             </h2>
           </div>
           <p className="max-w-2xl text-base leading-8 text-black/60 lg:justify-self-end">
-            The new landing page leads with the system XMem actually gives builders: ingest, judge, store, retrieve, and share context across every place an agent works.
+            XMem gives builders the pieces they usually stitch together themselves: ingest sources, judge updates, store durable facts, retrieve the right context, and share it across every agent surface.
           </p>
         </div>
 
         <div className="mt-12 grid gap-px overflow-hidden rounded-md border border-black/10 bg-black/10 md:grid-cols-2 xl:grid-cols-3">
-          {primitives.map(({ eyebrow, title, copy, icon: Icon }) => (
+          {primitives.map(({ eyebrow, title, copy }) => (
             <article key={title} className="group bg-[#fbf8f0] p-6 transition hover:bg-white">
               <div className="mb-9 flex items-start justify-between gap-4">
                 <div className="text-sm font-semibold text-black/35">{eyebrow}</div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-black/10 bg-black text-[#b8ff65]">
-                  <Icon className="h-5 w-5" />
-                </div>
+                <div className="mt-2 h-px w-16 bg-black/15 transition group-hover:bg-black/30" />
               </div>
               <h3 className="font-display text-2xl font-semibold text-black">{title}</h3>
               <p className="mt-3 text-sm leading-7 text-black/60">{copy}</p>
@@ -328,12 +311,12 @@ function StackComparisonSection() {
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-12 lg:grid-cols-[0.84fr_1.16fr] lg:items-start">
           <div className="lg:sticky lg:top-28">
-            <SectionLabel icon={Workflow}>Unified API</SectionLabel>
+            <SectionLabel>Unified API</SectionLabel>
             <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
               Replace the context glue with one memory control plane.
             </h2>
             <p className="mt-5 text-base leading-8 text-white/60">
-              Inspired by the best current infra pages, this section makes the problem visual: most teams wire together state, RAG, memory, and tools. XMem turns those pieces into one inspectable graph.
+              Most teams wire together state, RAG, memory, tools, and browser context by hand. XMem turns those moving pieces into one inspectable graph with one API.
             </p>
           </div>
 
@@ -341,7 +324,7 @@ function StackComparisonSection() {
             <div className="rounded-md border border-white/10 bg-white/[0.035] p-5">
               <div className="mb-5 flex items-center justify-between">
                 <h3 className="font-display text-2xl font-semibold">DIY memory stack</h3>
-                <X className="h-5 w-5 text-[#ff6b4a]" />
+                <span className="text-xs uppercase tracking-[0.18em] text-[#ff6b4a]">before</span>
               </div>
               <div className="space-y-3">
                 {oldStack.map((item) => (
@@ -356,7 +339,7 @@ function StackComparisonSection() {
             <div className="rounded-md border border-[#b8ff65]/25 bg-[#b8ff65]/[0.055] p-5">
               <div className="mb-5 flex items-center justify-between">
                 <h3 className="font-display text-2xl font-semibold">XMem plane</h3>
-                <Check className="h-5 w-5 text-[#b8ff65]" />
+                <span className="text-xs uppercase tracking-[0.18em] text-[#b8ff65]">after</span>
               </div>
               <div className="space-y-3">
                 {newStack.map((item) => (
@@ -372,11 +355,9 @@ function StackComparisonSection() {
 
         <div className="mt-14 overflow-hidden rounded-md border border-white/10 bg-[#0a0a0a]">
           <div className="grid gap-px bg-white/10 md:grid-cols-5">
-            {stackRows.map(([label, copy]) => (
+            {stackRows.map(([label, copy], index) => (
               <div key={label} className="bg-[#080808] p-5">
-                <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-[#3dd8ff]">
-                  <GitBranch className="h-4 w-4" />
-                </div>
+                <div className="mb-4 font-mono text-sm text-[#3dd8ff]/80">{String(index + 1).padStart(2, "0")}</div>
                 <h4 className="font-display text-xl font-semibold">{label}</h4>
                 <p className="mt-3 text-sm leading-7 text-white/55">{copy}</p>
               </div>
@@ -394,12 +375,12 @@ function DemoSection() {
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div>
-            <SectionLabel icon={TerminalSquare}>Builder workflow</SectionLabel>
+            <SectionLabel>Builder workflow</SectionLabel>
             <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
               Import context once. Reuse it everywhere.
             </h2>
             <p className="mt-5 max-w-xl text-base leading-8 text-white/60">
-              The landing page now shows a practical loop: scan a repo, import conversations, attach MCP, and give the next agent a clean memory bundle instead of a pasted wall of text.
+              Scan a repo, import conversations, attach MCP, and hand the next agent a clean memory bundle instead of a pasted wall of text.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -444,14 +425,13 @@ function DeveloperSection() {
         <div className="grid gap-12 lg:grid-cols-[1.04fr_0.96fr] lg:items-start">
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-sm border border-black/10 bg-black/[0.04] px-3 py-1.5 text-xs font-medium text-black/60">
-              <KeyRound className="h-3.5 w-3.5 text-[#236b4a]" />
               Developer surface
             </div>
             <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
               A memory layer developers can reason about.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-8 text-black/60">
-              The page avoids vague AI magic and shows concrete surfaces: commands, memory objects, domains, routing, and inspection.
+              Work with concrete surfaces: commands, memory objects, domains, routing rules, and inspection tools that make agent context auditable.
             </p>
           </div>
 
@@ -479,9 +459,9 @@ function DeveloperSection() {
         </div>
 
         <div className="mt-12 grid gap-px overflow-hidden rounded-md border border-black/10 bg-black/10 md:grid-cols-4">
-          {useCases.map(({ title, copy, icon: Icon }) => (
+          {useCases.map(({ title, copy }, index) => (
             <article key={title} className="bg-[#fbf8f0] p-6">
-              <Icon className="mb-8 h-6 w-6 text-[#236b4a]" />
+              <div className="mb-8 font-mono text-sm text-[#236b4a]">{String(index + 1).padStart(2, "0")}</div>
               <h3 className="font-display text-xl font-semibold">{title}</h3>
               <p className="mt-3 text-sm leading-7 text-black/60">{copy}</p>
             </article>
@@ -497,12 +477,12 @@ function SecuritySection() {
     <section className="bg-[#050505] px-5 py-24 text-white sm:px-8">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
         <div>
-          <SectionLabel icon={LockKeyhole}>Control</SectionLabel>
+          <SectionLabel>Control</SectionLabel>
           <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
             Memory is powerful only when teams can govern it.
           </h2>
           <p className="mt-5 text-base leading-8 text-white/60">
-            XMem's pitch is developer ownership: open-source infrastructure, inspectable objects, domain routing, and enough structure to keep agents from remembering the wrong thing forever.
+            XMem keeps ownership with developers through open-source infrastructure, inspectable objects, domain routing, and structure that prevents agents from carrying the wrong context forever.
           </p>
         </div>
 
@@ -513,7 +493,7 @@ function SecuritySection() {
             ["Portable", "Use the same context across agents, tools, and model providers."],
           ].map(([title, copy]) => (
             <div key={title} className="rounded-md border border-white/10 bg-white/[0.035] p-5">
-              <Zap className="mb-8 h-5 w-5 text-[#f7d56d]" />
+              <div className="mb-8 h-px w-14 bg-[#f7d56d]/60" />
               <h3 className="font-display text-xl font-semibold">{title}</h3>
               <p className="mt-3 text-sm leading-7 text-white/55">{copy}</p>
             </div>
