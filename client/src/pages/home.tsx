@@ -194,9 +194,13 @@ function HeroSection() {
   const [copiedInstallCommand, setCopiedInstallCommand] = useState(false);
 
   const copyInstallCommand = async () => {
-    await navigator.clipboard.writeText(installCommand);
-    setCopiedInstallCommand(true);
-    window.setTimeout(() => setCopiedInstallCommand(false), 1600);
+    try {
+      await navigator.clipboard.writeText(installCommand);
+      setCopiedInstallCommand(true);
+      window.setTimeout(() => setCopiedInstallCommand(false), 1600);
+    } catch {
+      setCopiedInstallCommand(false);
+    }
   };
 
   return (
@@ -265,6 +269,7 @@ function HeroSection() {
 function BenchmarkSection() {
   const [activeBenchmarkIndex, setActiveBenchmarkIndex] = useState(0);
   const activeBenchmark = benchmarkSets[activeBenchmarkIndex];
+  const benchmarkMaxScore = Math.max(...activeBenchmark.rows.map(([, value]) => Number(value)));
 
   return (
     <section id="benchmarks" className="relative overflow-hidden bg-[#050505] px-5 py-24 text-white sm:px-8">
@@ -329,7 +334,7 @@ function BenchmarkSection() {
                   <div className="font-semibold text-white/[0.74]">{label}</div>
                   <div className="font-mono text-xs text-[#b8ff65]">{value}</div>
                   <div className="h-2 rounded-full bg-white/[0.06]">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#4f7c2f] to-[#b8ff65] shadow-[0_0_18px_rgba(184,255,101,0.34)]" style={{ width: `${value}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#4f7c2f] to-[#b8ff65] shadow-[0_0_18px_rgba(184,255,101,0.34)]" style={{ width: `${(Number(value) / benchmarkMaxScore) * 100}%` }} />
                   </div>
                   <div className="text-xs leading-5 text-white/[0.48]">{note}</div>
                 </div>
