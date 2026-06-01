@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
@@ -67,7 +66,7 @@ function GitHubStarButton() {
       href={GITHUB_REPO_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white/80 transition-all hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+      className="hidden items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white/80 transition-all hover:border-white/20 hover:bg-white/[0.07] hover:text-white sm:flex"
     >
       <Github className="h-4 w-4" />
       <span className="hidden sm:inline">Star</span>
@@ -158,10 +157,7 @@ export function Navbar() {
   };
 
   return (
-    <motion.nav
-      initial={{ y: -80, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
+    <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "glass-strong py-3" : "py-6"}`}
       style={{
         borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "none",
@@ -348,22 +344,23 @@ export function Navbar() {
             <>
               <Link
                 href="/login"
-                className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2"
+                className="hidden text-sm text-white/60 hover:text-white transition-colors px-4 py-2 sm:inline-flex"
               >
                 Log in
               </Link>
               <Link
                 href="/scanner"
                 data-testid="button-get-started-nav"
-                className="text-sm font-medium px-4 py-2 rounded-md transition-all duration-200"
+                className="text-sm font-medium px-3 py-2 rounded-md transition-all duration-200 sm:px-4"
                 style={{ background: "white", color: "black" }}
               >
-                Get Started
+                <span className="sm:hidden">Start</span>
+                <span className="hidden sm:inline">Get Started</span>
               </Link>
             </>
           )}
         </div>
       </div>
-    </motion.nav>
+    </nav>
   );
 }
