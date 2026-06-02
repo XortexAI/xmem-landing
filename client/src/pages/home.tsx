@@ -6,6 +6,11 @@ import {
 } from "lucide-react";
 import { Navbar } from "../sections/Navbar";
 import { Footer } from "../sections/Footer";
+import {
+  PRO_MONTHLY_CREDITS,
+  detectBillingRegion,
+  formatRegionalProPrice,
+} from "@/lib/billing";
 
 const agentLogos = ["Claude", "Gemini", "Perplexity", "DeepSeek", "Cursor"];
 
@@ -136,14 +141,15 @@ const pricingPlans = [
   },
   {
     name: "Pro",
-    price: "$1",
+    price: "Rs 99",
     summary: "For builders moving memory into production.",
-    note: "Then pay as you go",
+    note: "per month",
     cta: "Get Pro",
     href: "/scanner",
     featured: true,
     features: [
       "Everything in Free",
+      "5,000 monthly Pro credits included",
       "Production-ready API access",
       "Pay-as-you-go usage for higher volume",
       "Priority access to new connectors",
@@ -348,6 +354,10 @@ function BenchmarkSection() {
 }
 
 function PricingSection() {
+  const [billingRegion] = useState(() => detectBillingRegion());
+  const proPrice = formatRegionalProPrice(billingRegion);
+  const proNote = `per month in ${billingRegion === "IN" ? "India" : "global regions"}`;
+
   return (
     <section id="pricing" className="bg-[#f5f1e8] px-5 py-24 text-black sm:px-8">
       <div className="mx-auto max-w-7xl">
@@ -366,7 +376,18 @@ function PricingSection() {
         </div>
 
         <div className="mt-12 grid overflow-hidden rounded-md border border-black/10 bg-black/10 lg:grid-cols-3">
-          {pricingPlans.map((plan) => (
+          {pricingPlans.map((plan) => {
+            const displayPrice = plan.name === "Pro" ? proPrice : plan.price;
+            const displayNote = plan.name === "Pro" ? proNote : plan.note;
+            const features = plan.name === "Pro"
+              ? plan.features.map((feature) =>
+                  feature === "5,000 monthly Pro credits included"
+                    ? `${PRO_MONTHLY_CREDITS.toLocaleString()} monthly Pro credits included`
+                    : feature,
+                )
+              : plan.features;
+
+            return (
             <article
               key={plan.name}
               className={`relative flex min-h-[500px] flex-col border-b border-black/10 p-6 last:border-b-0 lg:border-b-0 lg:border-r last:lg:border-r-0 ${plan.featured ? "bg-[#111] text-white shadow-[inset_0_2px_0_#b8ff65]" : "bg-[#fbf8f0] text-black"}`}
@@ -381,11 +402,11 @@ function PricingSection() {
                 ) : null}
               </div>
 
-              <div className="mt-10 font-display text-6xl font-semibold leading-none">{plan.price}</div>
-              <div className={`mt-5 text-sm font-semibold ${plan.featured ? "text-white" : "text-black"}`}>{plan.note}</div>
+              <div className="mt-10 font-display text-6xl font-semibold leading-none">{displayPrice}</div>
+              <div className={`mt-5 text-sm font-semibold ${plan.featured ? "text-white" : "text-black"}`}>{displayNote}</div>
 
               <ul className={`mt-5 space-y-3 text-sm leading-6 ${plan.featured ? "text-white/58" : "text-black/60"}`}>
-                {plan.features.map((feature) => (
+                {features.map((feature) => (
                   <li key={feature} className="flex gap-3">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-[#b8ff65]" />
                     {feature}
@@ -412,7 +433,8 @@ function PricingSection() {
                 )}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

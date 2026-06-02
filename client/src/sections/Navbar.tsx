@@ -11,6 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  detectBillingRegion,
+  formatRegionalProPrice,
+  type BillingRegion,
+} from "@/lib/billing";
+import {
   ArrowRight,
   BookOpen,
   Building2,
@@ -35,34 +40,6 @@ const extensionVideoUrl =
 
 const GITHUB_REPO = "XortexAI/Xmem";
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
-
-type BillingRegion = "IN" | "GLOBAL";
-
-function detectBillingRegion(): BillingRegion {
-  const configuredRegion = String(import.meta.env.VITE_XMEM_BILLING_REGION || "").toUpperCase();
-  if (configuredRegion === "IN" || configuredRegion === "GLOBAL") {
-    return configuredRegion;
-  }
-
-  if (typeof window !== "undefined") {
-    const urlRegion = new URLSearchParams(window.location.search).get("billing_region")?.toUpperCase();
-    if (urlRegion === "IN" || urlRegion === "GLOBAL") {
-      return urlRegion;
-    }
-  }
-
-  const languages = typeof navigator !== "undefined" ? navigator.languages || [navigator.language] : [];
-  if (languages.some((language) => /(^|-)IN$/i.test(language))) {
-    return "IN";
-  }
-
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return timezone === "Asia/Kolkata" || timezone === "Asia/Calcutta" ? "IN" : "GLOBAL";
-}
-
-function formatProPrice(region: BillingRegion) {
-  return region === "IN" ? "Rs 99" : "$3";
-}
 
 function GitHubStarButton() {
   const [stars, setStars] = useState<number | null>(null);
@@ -173,7 +150,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [billingRegion] = useState<BillingRegion>(() => detectBillingRegion());
   const { user, isAuthenticated, logout } = useAuth();
-  const proPrice = formatProPrice(billingRegion);
+  const proPrice = formatRegionalProPrice(billingRegion);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);

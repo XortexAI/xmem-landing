@@ -52,6 +52,15 @@ import {
   type RazorpayOrder,
   type RazorpaySuccessResponse,
 } from "@/lib/razorpay";
+import {
+  DEFAULT_PRO_PRICES,
+  PRO_MONTHLY_CREDITS,
+  detectBillingRegion,
+  formatMinorUnitPrice,
+  getRegionalPriceAmount,
+  type BillingPlanPrice,
+  type BillingRegion,
+} from "@/lib/billing";
 
 const MemoryBrain = lazy(() =>
   import("@/components/three-d/MemoryBrain").then((mod) => ({ default: mod.MemoryBrain })),
@@ -142,11 +151,6 @@ interface BillingPlan {
   regional_prices?: Partial<Record<BillingRegion, BillingPlanPrice>>;
 }
 
-interface BillingPlanPrice {
-  price_paise: number;
-  currency: string;
-}
-
 interface CreditPackage {
   id: string;
   label: string;
@@ -157,8 +161,6 @@ interface CreditPackage {
   badge?: string;
   region?: BillingRegion;
 }
-
-type BillingRegion = "IN" | "GLOBAL";
 
 const defaultKeyScopes = ["*"];
 
@@ -186,9 +188,9 @@ const baseCreditPackages: CreditPackage[] = [
     id: "pro",
     label: "Pro",
     description: "Full access for production apps, priority support, and pay-as-you-go usage.",
-    credits: 5000,
-    amountInMinorUnits: 9900,
-    currency: "INR",
+    credits: PRO_MONTHLY_CREDITS,
+    amountInMinorUnits: DEFAULT_PRO_PRICES.IN.amountInMinorUnits,
+    currency: DEFAULT_PRO_PRICES.IN.currency,
     badge: "Recommended",
   },
   {
@@ -217,33 +219,6 @@ const fallbackBillingSummary: BillingSummary = {
   invoices: [],
 };
 
-function detectBillingRegion(): BillingRegion {
-  const configuredRegion = String(import.meta.env.VITE_XMEM_BILLING_REGION || "").toUpperCase();
-  if (configuredRegion === "IN" || configuredRegion === "GLOBAL") {
-    return configuredRegion;
-  }
-
-  if (typeof window !== "undefined") {
-    const urlRegion = new URLSearchParams(window.location.search).get("billing_region")?.toUpperCase();
-    if (urlRegion === "IN" || urlRegion === "GLOBAL") {
-      return urlRegion;
-    }
-  }
-
-  const languages = typeof navigator !== "undefined" ? navigator.languages || [navigator.language] : [];
-  const hasIndianLocale = languages.some((language) => /(^|-)IN$/i.test(language));
-  if (hasIndianLocale) {
-    return "IN";
-  }
-
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (timezone === "Asia/Kolkata" || timezone === "Asia/Calcutta") {
-    return "IN";
-  }
-
-  return "GLOBAL";
-}
-
 function getPlanAmount(plan: BillingPlan | undefined, fallbackAmount: number, expectedCurrency: string) {
   if (plan?.currency && plan.currency !== expectedCurrency) {
     return fallbackAmount;
@@ -256,6 +231,7 @@ function getRegionalCreditPackages(region: BillingRegion, plans: BillingPlan[]):
   const backendProPlan = plans.find((plan) => plan.id === "pro");
   const backendProCredits = Number(backendProPlan?.monthly_credits || 0);
   const backendRegionalPrice = backendProPlan?.regional_prices?.[region];
+  const defaultProPrice = DEFAULT_PRO_PRICES[region];
 
   return baseCreditPackages.map((pack) => {
     if (pack.id !== "pro") {
@@ -266,8 +242,11 @@ function getRegionalCreditPackages(region: BillingRegion, plans: BillingPlan[]):
       return {
         ...pack,
         credits: backendProCredits || pack.credits,
-        amountInMinorUnits: Number(backendRegionalPrice?.price_paise ?? getPlanAmount(backendProPlan, 9900, "INR")),
-        currency: "INR",
+        amountInMinorUnits: getRegionalPriceAmount(
+          backendRegionalPrice,
+          getPlanAmount(backendProPlan, defaultProPrice.amountInMinorUnits, defaultProPrice.currency),
+        ),
+        currency: backendRegionalPrice?.currency || defaultProPrice.currency,
         region,
       };
     }
@@ -275,8 +254,8 @@ function getRegionalCreditPackages(region: BillingRegion, plans: BillingPlan[]):
     return {
       ...pack,
       credits: backendProCredits || pack.credits,
-      amountInMinorUnits: Number(backendRegionalPrice?.price_paise ?? 300),
-      currency: backendRegionalPrice?.currency || "USD",
+      amountInMinorUnits: getRegionalPriceAmount(backendRegionalPrice, defaultProPrice.amountInMinorUnits),
+      currency: backendRegionalPrice?.currency || defaultProPrice.currency,
       region,
     };
   });
@@ -287,23 +266,7 @@ function formatPackagePrice(pack: CreditPackage) {
     return "Custom";
   }
 
-  if (pack.amountInMinorUnits === 0) {
-    return "$0";
-  }
-
-  if (pack.currency === "USD") {
-    return `$${pack.amountInMinorUnits / 100}`;
-  }
-
-  if (pack.currency === "INR") {
-    return `Rs ${pack.amountInMinorUnits / 100}`;
-  }
-
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: pack.currency || "INR",
-    maximumFractionDigits: 0,
-  }).format(pack.amountInMinorUnits / 100);
+  return formatMinorUnitPrice(pack.amountInMinorUnits, pack.currency || "USD");
 }
 
 function getCreditBalance(summary: BillingSummary) {
@@ -311,7 +274,7 @@ function getCreditBalance(summary: BillingSummary) {
 }
 
 function getAccountStatus(summary: BillingSummary) {
-  return String(summary.status || summary.account_status || "trial").replace("_", " ");
+  return String(summary.status || summary.account_status || "trial").replace(/_/g, " ");
 }
 
 function getCurrentUsage(summary: BillingSummary | null) {
