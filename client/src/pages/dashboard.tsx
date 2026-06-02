@@ -127,6 +127,7 @@ interface Invoice {
   id: string;
   date: string;
   amount_paise: number;
+  currency?: string;
   status: "paid" | "pending" | "failed";
   credits: number;
   receipt_url?: string;
@@ -1891,7 +1892,9 @@ function BillingPanel({
                   </div>
                   <p className="text-sm text-gray-300">{formatNumber(invoice.credits)} credits</p>
                   <div className="flex items-center gap-3">
-                    <p className="font-medium text-white">{formatCurrency(invoice.amount_paise, billingSummary.currency)}</p>
+                    <p className="font-medium text-white">
+                      {formatCurrency(invoice.amount_paise, invoice.currency || billingSummary.currency)}
+                    </p>
                     <Badge className="border-white/10 bg-white/[0.06] capitalize text-gray-300">{invoice.status}</Badge>
                   </div>
                   {invoice.receipt_url && (
