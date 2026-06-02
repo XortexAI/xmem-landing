@@ -11,6 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  detectBillingRegion,
+  formatRegionalProPrice,
+  type BillingRegion,
+} from "@/lib/billing";
+import {
   ArrowRight,
   BookOpen,
   Building2,
@@ -143,7 +148,9 @@ function MegaMenu({
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [billingRegion] = useState<BillingRegion>(() => detectBillingRegion());
   const { user, isAuthenticated, logout } = useAuth();
+  const proPrice = formatRegionalProPrice(billingRegion);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -233,8 +240,8 @@ export function Navbar() {
             </div>
           </MegaMenu>
 
-          <MegaMenu label="Pricing" width="w-[560px]">
-            <div className="grid grid-cols-2 gap-4 p-5">
+          <MegaMenu label="Pricing" width="w-[720px]">
+            <div className="grid grid-cols-3 gap-4 p-5">
               <a
                 href="/scanner"
                 className="rounded-md border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07]"
@@ -243,6 +250,17 @@ export function Navbar() {
                 <div className="text-sm font-semibold text-white">Free for everyone</div>
                 <p className="mt-2 text-xs leading-relaxed text-white/50">
                   Scanner, context importer, docs, and local extension setup for individual builders.
+                </p>
+              </a>
+              <a
+                href="/dashboard"
+                className="rounded-md border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07]"
+              >
+                <Sparkles className="mb-4 h-5 w-5 text-white/70" />
+                <div className="text-sm font-semibold text-white">Pro</div>
+                <p className="mt-2 text-xl font-semibold tracking-normal text-white">{proPrice}</p>
+                <p className="mt-2 text-xs leading-relaxed text-white/50">
+                  5,000 monthly credits, production API access, and priority support.
                 </p>
               </a>
               <a
