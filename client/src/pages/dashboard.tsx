@@ -126,10 +126,20 @@ interface BillingSummary {
 interface Invoice {
   id: string;
   date: string;
-  amount_paise: number;
+  amount_minor_units: number;
+  currency?: string;
   status: "paid" | "pending" | "failed";
   credits: number;
   receipt_url?: string;
+}
+
+interface ApiInvoice extends Omit<Invoice, "amount_minor_units"> {
+  amount_minor_units?: number;
+  amount_paise?: number;
+}
+
+interface ApiBillingSummary extends Omit<BillingSummary, "invoices"> {
+  invoices?: ApiInvoice[];
 }
 
 interface CreditLot {
@@ -306,6 +316,17 @@ function getRazorpayDisplayConfig(currency: string) {
   };
 }
 
+function normalizeBillingSummary(summary: ApiBillingSummary): BillingSummary {
+  return {
+    ...summary,
+    invoices: (summary.invoices || []).map((invoice) => ({
+      ...invoice,
+      amount_minor_units:
+        invoice.amount_minor_units ?? invoice.amount_paise ?? 0,
+    })),
+  };
+}
+
 export default function Dashboard() {
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
@@ -399,7 +420,7 @@ export default function Dashboard() {
       }
 
       const data = await response.json();
-      setBillingSummary(data.summary || data);
+      setBillingSummary(normalizeBillingSummary(data.summary || data));
       setBillingPlans(Array.isArray(data.plans) ? data.plans : []);
     } catch (err) {
       console.error("Error fetching billing summary:", err);
@@ -694,12 +715,14 @@ export default function Dashboard() {
     });
   };
 
-  const formatCurrency = (amountInPaise: number, currency = "INR") => {
-    return new Intl.NumberFormat("en-IN", {
+  const formatCurrency = (amountInMinorUnits: number, currency = "INR") => {
+    const normalizedCurrency = currency.toUpperCase();
+    const locale = normalizedCurrency === "USD" ? "en-US" : "en-IN";
+    return new Intl.NumberFormat(locale, {
       style: "currency",
-      currency,
+      currency: normalizedCurrency,
       maximumFractionDigits: 0,
-    }).format(amountInPaise / 100);
+    }).format(amountInMinorUnits / 100);
   };
 
   const formatNumber = (value: number) => {
@@ -1752,7 +1775,7 @@ function BillingPanel({
   billingRegion: BillingRegion;
   billingWarning: string | null;
   billingPackageId: string | null;
-  formatCurrency: (amountInPaise: number, currency?: string) => string;
+  formatCurrency: (amountInMinorUnits: number, currency?: string) => string;
   formatNumber: (value: number) => string;
   formatDate: (dateString: string) => string;
   onBuyCredits: (selectedPackage: CreditPackage) => void;
@@ -1891,7 +1914,12 @@ function BillingPanel({
                   </div>
                   <p className="text-sm text-gray-300">{formatNumber(invoice.credits)} credits</p>
                   <div className="flex items-center gap-3">
-                    <p className="font-medium text-white">{formatCurrency(invoice.amount_paise, billingSummary.currency)}</p>
+                    <p className="font-medium text-white">
+                      {formatCurrency(
+                        invoice.amount_minor_units,
+                        invoice.currency || billingSummary.currency,
+                      )}
+                    </p>
                     <Badge className="border-white/10 bg-white/[0.06] capitalize text-gray-300">{invoice.status}</Badge>
                   </div>
                   {invoice.receipt_url && (
