@@ -1,15 +1,18 @@
 export interface RazorpayOrder {
   id?: string;
   order_id?: string;
+  subscription_id?: string;
   amount: number;
   currency: string;
   key_id?: string;
   receipt?: string;
+  package_id?: string;
 }
 
 export interface RazorpaySuccessResponse {
   razorpay_payment_id: string;
-  razorpay_order_id: string;
+  razorpay_order_id?: string;
+  razorpay_subscription_id?: string;
   razorpay_signature: string;
 }
 
@@ -19,7 +22,8 @@ export interface RazorpayOptions {
   currency: string;
   name: string;
   description: string;
-  order_id: string;
+  order_id?: string;
+  subscription_id?: string;
   prefill?: {
     name?: string;
     email?: string;

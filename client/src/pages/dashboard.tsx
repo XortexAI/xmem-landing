@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, Suspense, lazy, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense, lazy, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,15 +93,25 @@ interface UsageSnapshot {
 }
 
 interface BillingSummary {
+  billing_account_id?: string;
+  owner_type?: string;
+  owner_id?: string;
+  plan_id?: string;
   plan_name: string;
-  account_status: "active" | "trial" | "paused" | "past_due";
+  account_status?: "active" | "trial" | "paused" | "past_due";
+  status?: string;
   currency: string;
-  credit_balance: number;
-  prepaid_balance_paise: number;
-  current_month: UsageSnapshot;
-  next_invoice_paise: number;
+  credit_balance?: number;
+  available_credits?: number;
+  reserved_credits?: number;
+  prepaid_balance_paise?: number;
+  current_month?: UsageSnapshot;
+  next_invoice_paise?: number;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  credit_lots?: CreditLot[];
   last_payment_at?: string;
-  invoices: Invoice[];
+  invoices?: Invoice[];
 }
 
 interface Invoice {
@@ -113,15 +123,42 @@ interface Invoice {
   receipt_url?: string;
 }
 
+interface CreditLot {
+  id: string;
+  source: string;
+  remaining_credits: number;
+  expires_at?: string | null;
+}
+
+interface BillingPlan {
+  id: string;
+  name: string;
+  amount?: number;
+  price_paise?: number;
+  currency?: string;
+  monthly_credits?: number;
+  trial_credits?: number;
+  trial_days?: number;
+  regional_prices?: Partial<Record<BillingRegion, BillingPlanPrice>>;
+}
+
+interface BillingPlanPrice {
+  price_paise: number;
+  currency: string;
+}
+
 interface CreditPackage {
   id: string;
   label: string;
   description: string;
   credits: number;
-  amountInPaise: number;
+  amountInMinorUnits: number;
   currency?: string;
   badge?: string;
+  region?: BillingRegion;
 }
+
+type BillingRegion = "IN" | "GLOBAL";
 
 const defaultKeyScopes = ["*"];
 
@@ -136,22 +173,22 @@ const apiScopeOptions = [
   { value: "chrome_ext:access", label: "Chrome extension", description: "Browser extension access" },
 ];
 
-const creditPackages: CreditPackage[] = [
+const baseCreditPackages: CreditPackage[] = [
   {
     id: "free",
     label: "Free",
     description: "30 days free with access to the core platform, Chrome extension, MCP, and SDKs.",
     credits: 0,
-    amountInPaise: 0,
+    amountInMinorUnits: 0,
     badge: "Current",
   },
   {
     id: "pro",
     label: "Pro",
     description: "Full access for production apps, priority support, and pay-as-you-go usage.",
-    credits: 0,
-    amountInPaise: 100,
-    currency: "USD",
+    credits: 5000,
+    amountInMinorUnits: 9900,
+    currency: "INR",
     badge: "Recommended",
   },
   {
@@ -159,7 +196,7 @@ const creditPackages: CreditPackage[] = [
     label: "Enterprise",
     description: "Dedicated onboarding, custom limits, security reviews, and team support.",
     credits: 0,
-    amountInPaise: 0,
+    amountInMinorUnits: 0,
   },
 ];
 
@@ -179,6 +216,132 @@ const fallbackBillingSummary: BillingSummary = {
   next_invoice_paise: 0,
   invoices: [],
 };
+
+function detectBillingRegion(): BillingRegion {
+  const configuredRegion = String(import.meta.env.VITE_XMEM_BILLING_REGION || "").toUpperCase();
+  if (configuredRegion === "IN" || configuredRegion === "GLOBAL") {
+    return configuredRegion;
+  }
+
+  if (typeof window !== "undefined") {
+    const urlRegion = new URLSearchParams(window.location.search).get("billing_region")?.toUpperCase();
+    if (urlRegion === "IN" || urlRegion === "GLOBAL") {
+      return urlRegion;
+    }
+  }
+
+  const languages = typeof navigator !== "undefined" ? navigator.languages || [navigator.language] : [];
+  const hasIndianLocale = languages.some((language) => /(^|-)IN$/i.test(language));
+  if (hasIndianLocale) {
+    return "IN";
+  }
+
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (timezone === "Asia/Kolkata" || timezone === "Asia/Calcutta") {
+    return "IN";
+  }
+
+  return "GLOBAL";
+}
+
+function getPlanAmount(plan: BillingPlan | undefined, fallbackAmount: number, expectedCurrency: string) {
+  if (plan?.currency && plan.currency !== expectedCurrency) {
+    return fallbackAmount;
+  }
+
+  return Number(plan?.price_paise ?? plan?.amount ?? fallbackAmount);
+}
+
+function getRegionalCreditPackages(region: BillingRegion, plans: BillingPlan[]): CreditPackage[] {
+  const backendProPlan = plans.find((plan) => plan.id === "pro");
+  const backendProCredits = Number(backendProPlan?.monthly_credits || 0);
+  const backendRegionalPrice = backendProPlan?.regional_prices?.[region];
+
+  return baseCreditPackages.map((pack) => {
+    if (pack.id !== "pro") {
+      return pack;
+    }
+
+    if (region === "IN") {
+      return {
+        ...pack,
+        credits: backendProCredits || pack.credits,
+        amountInMinorUnits: Number(backendRegionalPrice?.price_paise ?? getPlanAmount(backendProPlan, 9900, "INR")),
+        currency: "INR",
+        region,
+      };
+    }
+
+    return {
+      ...pack,
+      credits: backendProCredits || pack.credits,
+      amountInMinorUnits: Number(backendRegionalPrice?.price_paise ?? 300),
+      currency: backendRegionalPrice?.currency || "USD",
+      region,
+    };
+  });
+}
+
+function formatPackagePrice(pack: CreditPackage) {
+  if (pack.id === "enterprise") {
+    return "Custom";
+  }
+
+  if (pack.amountInMinorUnits === 0) {
+    return "$0";
+  }
+
+  if (pack.currency === "USD") {
+    return `$${pack.amountInMinorUnits / 100}`;
+  }
+
+  if (pack.currency === "INR") {
+    return `Rs ${pack.amountInMinorUnits / 100}`;
+  }
+
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: pack.currency || "INR",
+    maximumFractionDigits: 0,
+  }).format(pack.amountInMinorUnits / 100);
+}
+
+function getCreditBalance(summary: BillingSummary) {
+  return Number(summary.available_credits ?? summary.credit_balance ?? 0);
+}
+
+function getAccountStatus(summary: BillingSummary) {
+  return String(summary.status || summary.account_status || "trial").replace("_", " ");
+}
+
+function getCurrentUsage(summary: BillingSummary | null) {
+  return summary?.current_month || fallbackBillingSummary.current_month!;
+}
+
+function getRazorpayDisplayConfig(currency: string) {
+  if (currency !== "INR") {
+    return undefined;
+  }
+
+  return {
+    display: {
+      blocks: {
+        upi: {
+          name: "Pay using UPI",
+          instruments: [
+            {
+              method: "upi",
+            },
+          ],
+        },
+      },
+      sequence: ["block.upi"],
+      preferences: {
+        show_default_blocks: true,
+      },
+    },
+  };
+}
 
 export default function Dashboard() {
   const { user, token, logout } = useAuth();
@@ -200,10 +363,12 @@ export default function Dashboard() {
   const [isEditing, setIsEditing] = useState(false);
 
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(true);
   const [billingWarning, setBillingWarning] = useState<string | null>(null);
   const [billingPackageId, setBillingPackageId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<DashboardSection>("overview");
+  const billingRegion = useMemo(() => detectBillingRegion(), []);
 
   const {
     data: memoryData,
@@ -272,9 +437,11 @@ export default function Dashboard() {
 
       const data = await response.json();
       setBillingSummary(data.summary || data);
+      setBillingPlans(Array.isArray(data.plans) ? data.plans : []);
     } catch (err) {
       console.error("Error fetching billing summary:", err);
       setBillingSummary(fallbackBillingSummary);
+      setBillingPlans([]);
       setBillingWarning(null);
     } finally {
       setIsBillingLoading(false);
@@ -426,8 +593,9 @@ export default function Dashboard() {
           ...payment,
           package_id: selectedPackage.id,
           credits: selectedPackage.credits,
-          amount: order.amount || selectedPackage.amountInPaise,
+          amount: order.amount || selectedPackage.amountInMinorUnits,
           currency: order.currency || "INR",
+          billing_region: selectedPackage.region || billingRegion,
         }),
       });
 
@@ -470,8 +638,9 @@ export default function Dashboard() {
         body: JSON.stringify({
           package_id: selectedPackage.id,
           credits: selectedPackage.credits,
-          amount: selectedPackage.amountInPaise,
+          amount: selectedPackage.amountInMinorUnits,
           currency: selectedPackage.currency || "INR",
+          billing_region: selectedPackage.region || billingRegion,
         }),
       });
 
@@ -484,11 +653,12 @@ export default function Dashboard() {
       }
 
       const order: RazorpayOrder = await orderResponse.json();
-      const orderId = order.id || order.order_id;
+      const subscriptionId = order.subscription_id;
+      const orderId = order.order_id || (subscriptionId ? undefined : order.id);
       const publicKey = order.key_id || RAZORPAY_KEY_ID;
 
-      if (!orderId) {
-        throw new Error("Razorpay order ID was missing");
+      if (!orderId && !subscriptionId) {
+        throw new Error("Razorpay checkout ID was missing");
       }
 
       if (!publicKey) {
@@ -501,13 +671,16 @@ export default function Dashboard() {
         throw new Error("Razorpay Checkout did not initialize");
       }
 
+      const checkoutCurrency = order.currency || selectedPackage.currency || "INR";
+      const checkoutAmount = order.amount || selectedPackage.amountInMinorUnits;
       const checkout = new window.Razorpay({
         key: publicKey,
-        amount: order.amount || selectedPackage.amountInPaise,
-        currency: order.currency || selectedPackage.currency || "INR",
+        amount: checkoutAmount,
+        currency: checkoutCurrency,
         name: "XMem",
         description: `${selectedPackage.label} plan`,
-        order_id: orderId,
+        ...(orderId ? { order_id: orderId } : {}),
+        ...(subscriptionId ? { subscription_id: subscriptionId } : {}),
         prefill: {
           name: user?.name,
           email: user?.email,
@@ -515,28 +688,12 @@ export default function Dashboard() {
         notes: {
           package_id: selectedPackage.id,
           credits: String(selectedPackage.credits),
+          billing_region: selectedPackage.region || billingRegion,
         },
         theme: {
           color: "#0f172a",
         },
-        config: {
-          display: {
-            blocks: {
-              upi: {
-                name: "Pay using UPI",
-                instruments: [
-                  {
-                    method: "upi",
-                  },
-                ],
-              },
-            },
-            sequence: ["block.upi"],
-            preferences: {
-              show_default_blocks: true,
-            },
-          },
-        },
+        config: getRazorpayDisplayConfig(checkoutCurrency),
         handler: (payment) => {
           void verifyRazorpayPayment(payment, selectedPackage, order);
         },
@@ -604,7 +761,7 @@ export default function Dashboard() {
   };
 
   const activeApiKeys = apiKeys.filter((key) => key.is_active).length;
-  const currentUsage = billingSummary?.current_month || fallbackBillingSummary.current_month;
+  const currentUsage = getCurrentUsage(billingSummary);
   const usagePercent =
     currentUsage.credits_limit > 0
       ? Math.min(100, Math.round((currentUsage.credits_used / currentUsage.credits_limit) * 100))
@@ -622,7 +779,7 @@ export default function Dashboard() {
               onSectionChange={setActiveSection}
               activeApiKeys={activeApiKeys}
               memoryCount={memoryData?.total_memories || 0}
-              creditBalance={billingSummary?.credit_balance || 0}
+              creditBalance={billingSummary ? getCreditBalance(billingSummary) : 0}
               formatNumber={formatNumber}
             />
 
@@ -676,7 +833,7 @@ export default function Dashboard() {
                   <section className="grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2 xl:grid-cols-4">
                     <MetricCard
                       label="Credit balance"
-                      value={isBillingLoading ? "Loading" : formatNumber(billingSummary?.credit_balance || 0)}
+                      value={isBillingLoading ? "Loading" : formatNumber(billingSummary ? getCreditBalance(billingSummary) : 0)}
                       detail={billingSummary?.plan_name || "Free trial"}
                     />
                     <MetricCard
@@ -766,6 +923,8 @@ export default function Dashboard() {
               {activeSection === "billing" && (
                 <BillingPanel
                   billingSummary={billingSummary || fallbackBillingSummary}
+                  billingPlans={billingPlans}
+                  billingRegion={billingRegion}
                   billingWarning={billingWarning}
                   billingPackageId={billingPackageId}
                   formatCurrency={formatCurrency}
@@ -1616,6 +1775,8 @@ function PlanCard({
 
 function BillingPanel({
   billingSummary,
+  billingPlans,
+  billingRegion,
   billingWarning,
   billingPackageId,
   formatCurrency,
@@ -1624,6 +1785,8 @@ function BillingPanel({
   onBuyCredits,
 }: {
   billingSummary: BillingSummary;
+  billingPlans: BillingPlan[];
+  billingRegion: BillingRegion;
   billingWarning: string | null;
   billingPackageId: string | null;
   formatCurrency: (amountInPaise: number, currency?: string) => string;
@@ -1631,9 +1794,14 @@ function BillingPanel({
   formatDate: (dateString: string) => string;
   onBuyCredits: (selectedPackage: CreditPackage) => void;
 }) {
+  const creditPackages = getRegionalCreditPackages(billingRegion, billingPlans);
   const freePlan = creditPackages.find((pack) => pack.id === "free")!;
   const proPlan = creditPackages.find((pack) => pack.id === "pro")!;
   const enterprisePlan = creditPackages.find((pack) => pack.id === "enterprise")!;
+  const isPro = billingSummary.plan_id === "pro" || billingSummary.plan_name === "Pro";
+  const invoices = billingSummary.invoices || [];
+  const prepaidBalance = billingSummary.prepaid_balance_paise || 0;
+  const nextInvoice = billingSummary.next_invoice_paise || 0;
 
   return (
     <div className="space-y-6">
@@ -1672,25 +1840,26 @@ function BillingPanel({
 
             <PlanCard
               plan={proPlan}
-              price="$1"
-              caption="then pay as you go"
+              price={formatPackagePrice(proPlan)}
+              caption={`per month in ${billingRegion === "IN" ? "India" : "global regions"}`}
               features={[
                 "Everything in Free",
+                `${formatNumber(proPlan.credits)} monthly Pro credits included`,
                 "Production-ready API access",
                 "Pay-as-you-go usage for higher volume",
                 "24/7 customer support",
                 "Access to exclusive features coming soon",
               ]}
               actionLabel={
-                billingSummary.plan_name === "Pro"
+                isPro
                   ? "Current plan"
                   : billingPackageId === proPlan.id
                   ? "Processing"
                   : "Start Pro"
               }
               loading={billingPackageId === proPlan.id}
-              disabled={!!billingPackageId || billingSummary.plan_name === "Pro"}
-              highlighted={billingSummary.plan_name !== "Pro"}
+              disabled={!!billingPackageId || isPro}
+              highlighted={!isPro}
               onAction={() => onBuyCredits(proPlan)}
             />
 
@@ -1717,19 +1886,19 @@ function BillingPanel({
         <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-5">
           <p className="text-xs font-medium uppercase text-gray-500">Current plan</p>
           <p className="mt-2 text-lg font-semibold text-white">{billingSummary.plan_name}</p>
-          <p className="mt-1 text-sm capitalize text-gray-500">{billingSummary.account_status.replace("_", " ")}</p>
+          <p className="mt-1 text-sm capitalize text-gray-500">{getAccountStatus(billingSummary)}</p>
         </div>
         <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-5">
           <p className="text-xs font-medium uppercase text-gray-500">Credit balance</p>
-          <p className="mt-2 text-lg font-semibold text-white">{formatNumber(billingSummary.credit_balance)}</p>
+          <p className="mt-2 text-lg font-semibold text-white">{formatNumber(getCreditBalance(billingSummary))}</p>
           <p className="mt-1 text-sm text-gray-500">
-            {formatCurrency(billingSummary.prepaid_balance_paise, billingSummary.currency)} balance value
+            {formatCurrency(prepaidBalance, billingSummary.currency)} balance value
           </p>
         </div>
         <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-5">
           <p className="text-xs font-medium uppercase text-gray-500">Next invoice</p>
           <p className="mt-2 text-lg font-semibold text-white">
-            {formatCurrency(billingSummary.next_invoice_paise, billingSummary.currency)}
+            {formatCurrency(nextInvoice, billingSummary.currency)}
           </p>
           <p className="mt-1 text-sm text-gray-500">Usage charges after plan access</p>
         </div>
@@ -1741,14 +1910,14 @@ function BillingPanel({
           <CardDescription className="text-gray-400">Recent Razorpay payments and invoices.</CardDescription>
         </CardHeader>
         <CardContent>
-          {billingSummary.invoices.length === 0 ? (
+          {invoices.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/15 py-10 text-center">
               <p className="text-sm font-medium text-white">No payments yet</p>
               <p className="mt-1 text-sm text-gray-500">Completed Razorpay payments will appear here.</p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border border-white/10">
-              {billingSummary.invoices.map((invoice) => (
+              {invoices.map((invoice) => (
                 <div
                   key={invoice.id}
                   className="grid gap-3 border-b border-white/10 bg-[#0a0a0a] p-4 last:border-b-0 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center"
