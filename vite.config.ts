@@ -29,8 +29,7 @@ export default defineConfig({
 
           // Framer Motion 
           if (
-            id.includes("node_modules/framer-motion") ||
-            id.includes("node_modules/motion")
+            id.includes("node_modules/framer-motion")
           ) {
             return "vendor-motion";
           }
@@ -73,7 +72,7 @@ export default defineConfig({
           ) {
             return "vendor-forms";
           }
- 
+
           // All remaining node_modules
           // lucide-react, wouter, clsx, date-fns, jwt-decode, etc.
           if (id.includes("node_modules")) {
