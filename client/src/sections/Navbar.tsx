@@ -35,6 +35,8 @@ const extensionVideoUrl =
 
 const GITHUB_REPO = "XortexAI/Xmem";
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+const dashboardHref = "/dashboard";
+const billingHref = "/dashboard?section=billing";
 
 function GitHubStarButton() {
   const [stars, setStars] = useState<number | null>(null);
@@ -144,6 +146,7 @@ function MegaMenu({
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
+  const pricingHref = billingHref;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -236,7 +239,7 @@ export function Navbar() {
           <MegaMenu label="Pricing" width="w-[560px]">
             <div className="grid grid-cols-2 gap-4 p-5">
               <a
-                href="/scanner"
+                href={pricingHref}
                 className="rounded-md border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07]"
               >
                 <Sparkles className="mb-4 h-5 w-5 text-white/70" />
@@ -325,7 +328,7 @@ export function Navbar() {
                 <DropdownMenuSeparator className="bg-gray-800" />
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-gray-800 focus:text-white"
-                  onClick={() => window.location.href = '/dashboard'}
+                  onClick={() => window.location.href = dashboardHref}
                 >
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Dashboard
@@ -349,7 +352,7 @@ export function Navbar() {
                 Log in
               </Link>
               <Link
-                href="/scanner"
+                href={dashboardHref}
                 data-testid="button-get-started-nav"
                 className="text-sm font-medium px-3 py-2 rounded-md transition-all duration-200 sm:px-4"
                 style={{ background: "white", color: "black" }}

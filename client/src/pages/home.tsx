@@ -7,6 +7,8 @@ import {
 import { Navbar } from "../sections/Navbar";
 import { Footer } from "../sections/Footer";
 
+const dashboardHref = "/dashboard";
+const billingHref = "/dashboard?section=billing";
 const agentLogos = ["Claude", "Gemini", "Perplexity", "DeepSeek", "Cursor"];
 
 const primitives = [
@@ -125,7 +127,7 @@ const pricingPlans = [
     summary: "For builders validating memory workflows.",
     note: "30 days of core platform access",
     cta: "Start free",
-    href: "/scanner",
+    href: billingHref,
     features: [
       "Full XMem dashboard access",
       "Chrome extension included",
@@ -140,7 +142,7 @@ const pricingPlans = [
     summary: "For builders moving memory into production.",
     note: "Then pay as you go",
     cta: "Get Pro",
-    href: "/scanner",
+    href: billingHref,
     featured: true,
     features: [
       "Everything in Free",
@@ -225,7 +227,7 @@ function HeroSection() {
 
         <div className="mt-9 flex w-full max-w-[19rem] flex-col items-center justify-center gap-3 sm:max-w-none sm:flex-row">
           <Link
-            href="/scanner"
+            href={dashboardHref}
             data-testid="button-start-building"
             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#b8ff65] px-5 text-sm font-semibold text-black shadow-[0_0_40px_rgba(184,255,101,0.16)] transition hover:bg-[#d9ff9b] sm:w-auto"
           >
@@ -667,7 +669,7 @@ function CTASection() {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
-            href="/scanner"
+            href={dashboardHref}
             className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-semibold text-white transition hover:bg-black/85"
           >
             Start building
