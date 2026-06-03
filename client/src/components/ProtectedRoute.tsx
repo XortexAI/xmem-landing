@@ -8,9 +8,9 @@ interface ProtectedRouteProps {
   children?: React.ReactNode;
 }
 
-const getReturnUrl = (location: string) => {
+const getReturnUrl = (ssrFallbackLocation: string) => {
   if (typeof window === "undefined") {
-    return location;
+    return ssrFallbackLocation;
   }
 
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;

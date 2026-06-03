@@ -153,7 +153,6 @@ export function Navbar() {
   const [billingRegion] = useState<BillingRegion>(() => detectBillingRegion());
   const { user, isAuthenticated, logout } = useAuth();
   const proPrice = formatRegionalProPrice(billingRegion);
-  const pricingHref = billingHref;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -246,7 +245,7 @@ export function Navbar() {
           <MegaMenu label="Pricing" width="w-[720px]">
             <div className="grid grid-cols-3 gap-4 p-5">
               <a
-                href={pricingHref}
+                href={billingHref}
                 className="rounded-md border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07]"
               >
                 <Sparkles className="mb-4 h-5 w-5 text-white/70" />
@@ -256,7 +255,7 @@ export function Navbar() {
                 </p>
               </a>
               <a
-                href="/dashboard"
+                href={billingHref}
                 className="rounded-md border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07]"
               >
                 <Sparkles className="mb-4 h-5 w-5 text-white/70" />
