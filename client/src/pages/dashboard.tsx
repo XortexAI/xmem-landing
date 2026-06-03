@@ -351,7 +351,7 @@ export default function Dashboard() {
   const [isBillingLoading, setIsBillingLoading] = useState(true);
   const [billingWarning, setBillingWarning] = useState<string | null>(null);
   const [billingPackageId, setBillingPackageId] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<DashboardSection>("overview");
+  const [activeSection, setActiveSection] = useState<DashboardSection>(() => getDashboardSectionFromUrl());
   const billingRegion = useMemo(() => detectBillingRegion(), []);
 
   const {
@@ -366,6 +366,25 @@ export default function Dashboard() {
     logout();
     window.location.href = "/login";
   }, [logout]);
+
+  const handleSectionChange = useCallback((section: DashboardSection) => {
+    setActiveSection(section);
+    const nextPath = section === "overview" ? "/dashboard" : `/dashboard?section=${section}`;
+    window.history.pushState(null, "", nextPath);
+  }, []);
+
+  useEffect(() => {
+    const syncSectionFromUrl = () => {
+      setActiveSection(getDashboardSectionFromUrl());
+    };
+
+    window.addEventListener("popstate", syncSectionFromUrl);
+    window.addEventListener("hashchange", syncSectionFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncSectionFromUrl);
+      window.removeEventListener("hashchange", syncSectionFromUrl);
+    };
+  }, []);
 
   const fetchApiKeys = useCallback(async () => {
     if (!token) return;
@@ -754,15 +773,19 @@ export default function Dashboard() {
       : 0;
 
   return (
-    <div className="min-h-screen bg-[#080808] text-white">
+    <div className="min-h-screen bg-[#050505] text-white">
       <Navbar />
 
-      <main className="px-3 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <main className="relative overflow-hidden px-3 pb-14 pt-20 sm:px-6 sm:pt-24 lg:px-8">
+        <div className="absolute inset-0 xmem-grid opacity-20" aria-hidden="true" />
+        <div className="absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_50%_0%,rgba(184,255,101,0.16),transparent_58%)]" aria-hidden="true" />
+        <div className="absolute inset-x-0 bottom-0 h-80 bg-[radial-gradient(circle_at_20%_100%,rgba(245,241,232,0.08),transparent_54%)]" aria-hidden="true" />
+
+        <div className="relative mx-auto max-w-7xl">
           <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
             <DashboardSidebar
               activeSection={activeSection}
-              onSectionChange={setActiveSection}
+              onSectionChange={handleSectionChange}
               activeApiKeys={activeApiKeys}
               memoryCount={memoryData?.total_memories || 0}
               creditBalance={billingSummary ? getCreditBalance(billingSummary) : 0}
@@ -770,10 +793,12 @@ export default function Dashboard() {
             />
 
             <section className="min-w-0">
-              <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:pb-6">
+              <div className="mb-6 flex flex-col gap-4 rounded-md border border-white/10 bg-[#090a09]/88 p-5 shadow-2xl shadow-black/30 backdrop-blur-md sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:p-6">
                 <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-normal text-gray-500">Account</p>
-                  <h1 className="text-2xl font-semibold tracking-normal text-white sm:text-3xl">
+                  <p className="mb-2 inline-flex rounded-sm border border-[#b8ff65]/20 bg-[#b8ff65]/10 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.16em] text-[#dfffaa]">
+                    Dashboard
+                  </p>
+                  <h1 className="font-display text-3xl font-semibold tracking-normal text-white sm:text-4xl">
                     {dashboardNavItems.find((item) => item.id === activeSection)?.label || "Dashboard"}
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
@@ -787,7 +812,7 @@ export default function Dashboard() {
                 {activeSection === "overview" && (
                   <Button
                     variant="outline"
-                    className="h-9 w-full border-white/10 bg-transparent text-gray-300 hover:bg-white/[0.06] hover:text-white sm:w-auto"
+                    className="h-10 w-full border-white/10 bg-transparent text-gray-300 hover:border-[#b8ff65]/30 hover:bg-[#b8ff65]/10 hover:text-white sm:w-auto"
                     onClick={() => {
                       refetchMemories();
                       void fetchApiKeys();
@@ -800,7 +825,7 @@ export default function Dashboard() {
                 {activeSection === "api-keys" && (
                   <Button
                     onClick={() => setIsCreateDialogOpen(true)}
-                    className="h-9 w-full bg-white text-black hover:bg-gray-200 sm:w-auto"
+                    className="h-10 w-full bg-[#b8ff65] text-black hover:bg-[#d9ff9b] sm:w-auto"
                   >
                     New API key
                   </Button>
@@ -841,7 +866,7 @@ export default function Dashboard() {
 
                   <div className="grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
                     <ProfilePanel user={user} onLogout={logout} formatDate={formatDate} />
-                    <Card className="border-white/10 bg-[#0d0d0d]">
+                    <Card className="border-white/10 bg-[#090a09]/90 shadow-xl shadow-black/20">
                       <CardHeader>
                         <CardTitle className="text-white">Usage this month</CardTitle>
                         <CardDescription className="text-gray-400">
@@ -856,7 +881,7 @@ export default function Dashboard() {
                               {formatNumber(currentUsage.credits_used)} / {formatNumber(currentUsage.credits_limit)}
                             </span>
                           </div>
-                          <Progress value={usagePercent} className="h-2 bg-white/10" />
+                          <Progress value={usagePercent} className="h-2 bg-white/10 [&>div]:bg-[#b8ff65]" />
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-3">
@@ -865,7 +890,7 @@ export default function Dashboard() {
                           <UsageItem label="Graph queries" value={currentUsage.graph_queries} />
                         </div>
 
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                        <div className="rounded-md border border-[#b8ff65]/20 bg-[#b8ff65]/[0.055] p-4">
                           <p className="text-sm font-medium text-white">Current plan</p>
                           <p className="mt-1 text-sm leading-6 text-gray-400">
                             {billingSummary?.plan_name || "Free trial"} access is active for this account.
@@ -949,7 +974,7 @@ export default function Dashboard() {
                   placeholder="Production, Development, Testing"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
-                  className="border-white/10 bg-[#0a0a0a] text-white placeholder:text-gray-500"
+                  className="border-white/10 bg-[#050505] text-white placeholder:text-gray-500 focus-visible:ring-[#b8ff65]/50"
                 />
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-4">
@@ -969,8 +994,8 @@ export default function Dashboard() {
                           onClick={() => toggleNewKeyScope(scope.value)}
                           className={`rounded-lg border p-3 text-left transition-colors ${
                             selected
-                              ? "border-white/25 bg-white/[0.08] text-white"
-                              : "border-white/10 bg-[#0a0a0a] text-gray-300 hover:bg-white/[0.04]"
+                              ? "border-[#b8ff65]/35 bg-[#b8ff65]/10 text-white"
+                              : "border-white/10 bg-[#050505] text-gray-300 hover:bg-white/[0.04]"
                           }`}
                         >
                           <span className="block text-sm font-medium">{scope.label}</span>
@@ -992,7 +1017,7 @@ export default function Dashboard() {
                 <Button
                   onClick={handleCreateKey}
                   disabled={!newKeyName.trim() || isCreating}
-                  className="bg-white text-black hover:bg-gray-200"
+                  className="bg-[#b8ff65] text-black hover:bg-[#d9ff9b]"
                 >
                   {isCreating ? (
                     <>
@@ -1017,7 +1042,7 @@ export default function Dashboard() {
                     This is the only time this API key will be shown.
                   </AlertDescription>
                 </Alert>
-                <div className="rounded-lg border border-white/10 bg-[#0a0a0a] p-4">
+                <div className="rounded-md border border-white/10 bg-[#050505] p-4">
                   <div className="flex items-center gap-2">
                     <code className="flex-1 break-all font-mono text-sm text-gray-200">
                       {newKey.key}
@@ -1042,7 +1067,7 @@ export default function Dashboard() {
                     setNewKeyScopes(defaultKeyScopes);
                     setIsCreateDialogOpen(false);
                   }}
-                  className="bg-white text-black hover:bg-gray-200"
+                  className="bg-[#b8ff65] text-black hover:bg-[#d9ff9b]"
                 >
                   <Check className="mr-2 h-4 w-4" />
                   Done
@@ -1066,7 +1091,7 @@ export default function Dashboard() {
               placeholder="API key name"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="border-white/10 bg-[#0a0a0a] text-white placeholder:text-gray-500"
+              className="border-white/10 bg-[#050505] text-white placeholder:text-gray-500 focus-visible:ring-[#b8ff65]/50"
             />
           </div>
           <DialogFooter>
@@ -1080,7 +1105,7 @@ export default function Dashboard() {
             <Button
               onClick={handleEditKey}
               disabled={!editName.trim() || isEditing}
-              className="bg-white text-black hover:bg-gray-200"
+              className="bg-[#b8ff65] text-black hover:bg-[#d9ff9b]"
             >
               {isEditing ? (
                 <>
@@ -1132,15 +1157,33 @@ function MetricCard({
   detail: string;
 }) {
   return (
-    <div className="min-w-0 bg-[#0d0d0d] p-4 sm:p-5">
-      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-      <p className="mt-3 break-words text-2xl font-semibold tracking-normal text-white">{value}</p>
-      <p className="mt-1 truncate text-sm text-gray-500">{detail}</p>
+    <div className="min-w-0 bg-[#090a09] p-4 transition-colors hover:bg-[#0d100b] sm:p-5">
+      <p className="text-xs font-medium uppercase text-white/42">{label}</p>
+      <p className="mt-3 break-words font-display text-3xl font-semibold tracking-normal text-[#b8ff65]">{value}</p>
+      <p className="mt-1 truncate text-sm text-white/45">{detail}</p>
     </div>
   );
 }
 
 type DashboardSection = "overview" | "api-keys" | "connectors" | "memories" | "billing";
+
+const dashboardSectionIds: DashboardSection[] = ["overview", "api-keys", "connectors", "memories", "billing"];
+
+function isDashboardSection(section: string | null): section is DashboardSection {
+  return !!section && dashboardSectionIds.includes(section as DashboardSection);
+}
+
+function getDashboardSectionFromUrl(): DashboardSection {
+  if (typeof window === "undefined") {
+    return "overview";
+  }
+
+  const querySection = new URLSearchParams(window.location.search).get("section");
+  const hashSection = window.location.hash.replace(/^#/, "");
+  if (isDashboardSection(querySection)) return querySection;
+  if (isDashboardSection(hashSection)) return hashSection;
+  return "overview";
+}
 
 const dashboardNavItems: Array<{
   id: DashboardSection;
@@ -1179,7 +1222,7 @@ function DashboardSidebar({
 
   return (
     <aside className="lg:self-start">
-      <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-2">
+      <div className="rounded-md border border-white/10 bg-[#090a09]/88 p-2 shadow-2xl shadow-black/30 backdrop-blur-md">
         <nav className="grid grid-cols-2 gap-1 lg:flex lg:flex-col">
           {dashboardNavItems.map((item) => {
             const isActive = activeSection === item.id;
@@ -1191,15 +1234,15 @@ function DashboardSidebar({
                 onClick={() => onSectionChange(item.id)}
                 className={`rounded-md border px-3 py-3 text-left transition-colors ${
                   isActive
-                    ? "border-white/10 bg-white/[0.08] text-white"
+                    ? "border-[#b8ff65]/35 bg-[#b8ff65]/[0.085] text-white shadow-[inset_2px_0_0_#b8ff65]"
                     : "border-transparent text-gray-400 hover:bg-white/[0.05] hover:text-white"
                 }`}
               >
                 <span className="block text-sm font-medium">{item.label}</span>
-                <span className={`mt-1 block text-xs ${isActive ? "text-gray-400" : "text-gray-600"}`}>
+                <span className={`mt-1 block text-xs ${isActive ? "text-white/55" : "text-gray-600"}`}>
                   {item.description}
                 </span>
-                <span className={`mt-2 block truncate font-mono text-xs sm:mt-3 ${isActive ? "text-gray-300" : "text-gray-500"}`}>
+                <span className={`mt-2 block truncate font-mono text-xs sm:mt-3 ${isActive ? "text-[#b8ff65]" : "text-gray-500"}`}>
                   {metaBySection[item.id]}
                 </span>
               </button>
@@ -1221,7 +1264,7 @@ function ProfilePanel({
   formatDate: (dateString: string) => string;
 }) {
   return (
-    <Card className="border-white/10 bg-[#0d0d0d]">
+    <Card className="border-white/10 bg-[#090a09]/90 shadow-xl shadow-black/20">
       <CardHeader>
         <CardTitle className="text-white">Profile</CardTitle>
         <CardDescription className="text-gray-400">Account identity and access state.</CardDescription>
@@ -1250,7 +1293,7 @@ function ProfilePanel({
 
         <Button
           variant="outline"
-          className="w-full border-white/10 bg-transparent text-gray-300 hover:bg-white/[0.06] hover:text-white"
+          className="w-full border-white/10 bg-transparent text-gray-300 hover:border-[#b8ff65]/30 hover:bg-[#b8ff65]/10 hover:text-white"
           onClick={onLogout}
         >
           Sign out
@@ -1271,7 +1314,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function UsageItem({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0a0a0a] p-4">
+    <div className="rounded-md border border-white/10 bg-[#050505] p-4">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="mt-1 font-mono text-lg text-white">{new Intl.NumberFormat("en-IN").format(value)}</p>
     </div>
@@ -1339,12 +1382,12 @@ function ConnectorRow({
             return (
               <div
                 key={connector.id}
-                className="group relative flex flex-col justify-between rounded-xl border border-white/5 bg-[#0d0d0d]/85 p-5 transition-all duration-300 hover:border-white/20 hover:bg-[#121212]/95 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)] w-[280px] shrink-0"
+                className="group relative flex w-[280px] shrink-0 flex-col justify-between rounded-md border border-white/10 bg-[#090a09]/88 p-5 transition-all duration-300 hover:border-[#b8ff65]/35 hover:bg-[#0d100b] hover:shadow-[0_0_25px_rgba(184,255,101,0.08)]"
               >
                 <div className="space-y-4">
                   {/* Logo & Status */}
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#161616] border border-white/5 overflow-hidden transition-all duration-300 group-hover:border-white/15">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-[#050505] transition-all duration-300 group-hover:border-[#b8ff65]/30">
                       {connector.logo && !logoErrors[connector.id] ? (
                         <img
                           src={`/connector_logos/${connector.logo}`}
@@ -1362,9 +1405,9 @@ function ConnectorRow({
                     <Badge
                       className={`text-[10px] font-semibold tracking-wide py-0.5 border ${
                         status.connected
-                          ? "border-green-800/40 bg-green-950/20 text-green-400"
+                          ? "border-[#b8ff65]/30 bg-[#b8ff65]/10 text-[#b8ff65]"
                           : status.label === "Ready"
-                          ? "border-blue-800/40 bg-blue-950/20 text-blue-400"
+                          ? "border-[#f5f1e8]/20 bg-[#f5f1e8]/10 text-[#f5f1e8]"
                           : "border-zinc-800 bg-zinc-900/40 text-zinc-400"
                       }`}
                     >
@@ -1374,7 +1417,7 @@ function ConnectorRow({
 
                   {/* Title & Category info */}
                   <div>
-                    <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-emerald-400 transition-colors duration-300">
+                    <h3 className="truncate text-base font-bold tracking-tight text-white transition-colors duration-300 group-hover:text-[#b8ff65]">
                       {connector.name}
                     </h3>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mt-0.5 block">
@@ -1397,7 +1440,7 @@ function ConnectorRow({
                   </Button>
                   <Button
                     size="sm"
-                    className="flex-1 bg-white text-black hover:bg-gray-200 text-xs h-8 font-semibold"
+                    className="h-8 flex-1 bg-[#b8ff65] text-xs font-semibold text-black hover:bg-[#d9ff9b]"
                     onClick={() => {
                       setLocation(connector.connectPath);
                     }}
@@ -1500,13 +1543,13 @@ function ApiKeysPanel({
   onDelete: (keyId: string) => void;
 }) {
   return (
-    <Card className="border-white/10 bg-[#0d0d0d]">
+    <Card className="border-white/10 bg-[#090a09]/90 shadow-xl shadow-black/20">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle className="text-white">API keys</CardTitle>
           <CardDescription className="text-gray-400">Create, rename, and revoke XMem API credentials.</CardDescription>
         </div>
-        <Button onClick={onCreate} className="h-9 w-full bg-white text-black hover:bg-gray-200 sm:w-auto">
+        <Button onClick={onCreate} className="h-9 w-full bg-[#b8ff65] text-black hover:bg-[#d9ff9b] sm:w-auto">
           New API key
         </Button>
       </CardHeader>
@@ -1521,7 +1564,7 @@ function ApiKeysPanel({
             <p className="mx-auto mt-2 max-w-md text-sm text-gray-400">
               Create your first key to start sending requests to XMem services.
             </p>
-            <Button onClick={onCreate} variant="outline" className="mt-5 border-white/10 text-gray-200 hover:bg-white/10 hover:text-white">
+            <Button onClick={onCreate} variant="outline" className="mt-5 border-white/10 text-gray-200 hover:border-[#b8ff65]/30 hover:bg-[#b8ff65]/10 hover:text-white">
               Create API key
             </Button>
           </div>
@@ -1530,7 +1573,7 @@ function ApiKeysPanel({
             {apiKeys.map((key) => (
               <div
                 key={key.id}
-                className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0a0a0a] p-4 md:flex-row md:items-center md:justify-between"
+                className="flex flex-col gap-4 rounded-md border border-white/10 bg-[#050505] p-4 md:flex-row md:items-center md:justify-between"
               >
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1610,7 +1653,7 @@ function MemoriesPanel({
   refetchMemories: () => Promise<void>;
 }) {
   return (
-    <Card className="overflow-hidden border-white/10 bg-[#0d0d0d]">
+    <Card className="overflow-hidden border-white/10 bg-[#090a09]/90 shadow-xl shadow-black/20">
         <CardHeader>
           <div>
             <CardTitle className="text-white">Your memories</CardTitle>
@@ -1631,7 +1674,7 @@ function MemoriesPanel({
             <Button
               onClick={() => void refetchMemories()}
               variant="outline"
-              className="mt-5 border-white/10 text-gray-200 hover:bg-white/10 hover:text-white"
+              className="mt-5 border-white/10 text-gray-200 hover:border-[#b8ff65]/30 hover:bg-[#b8ff65]/10 hover:text-white"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Try again
@@ -1651,7 +1694,7 @@ function MemoriesPanel({
         ) : (
           <>
             <div className="grid gap-4 lg:grid-cols-4">
-              <div className="h-[320px] overflow-hidden rounded-lg border border-white/10 bg-[#0a0a0a] sm:h-[420px] lg:col-span-3">
+              <div className="h-[320px] overflow-hidden rounded-md border border-white/10 bg-[#050505] sm:h-[420px] lg:col-span-3">
                 <Suspense
                   fallback={
                     <div className="flex h-full w-full items-center justify-center">
@@ -1685,7 +1728,7 @@ function MemoriesPanel({
 function LegendItem({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className="h-2 w-2 rounded-full bg-gray-500" />
+      <div className="h-2 w-2 rounded-full bg-[#b8ff65]" />
       <span className="text-xs text-gray-400">{label}</span>
     </div>
   );
@@ -1714,23 +1757,23 @@ function PlanCard({
 }) {
   return (
     <div
-      className={`flex flex-col rounded-lg border p-5 sm:min-h-[420px] sm:p-6 ${
-        highlighted ? "border-white/25 bg-white/[0.06]" : "border-white/10 bg-[#0a0a0a]"
+      className={`flex flex-col rounded-md border p-5 sm:min-h-[420px] sm:p-6 ${
+        highlighted ? "border-[#b8ff65]/40 bg-[#b8ff65]/[0.065] shadow-[inset_0_2px_0_#b8ff65]" : "border-white/10 bg-[#050505]"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-lg font-semibold text-white">{plan.label}</p>
+          <p className="font-display text-2xl font-semibold text-white">{plan.label}</p>
           <p className="mt-2 min-h-[48px] text-sm leading-6 text-gray-400">{plan.description}</p>
         </div>
         {plan.badge && (
-          <Badge className="border-white/10 bg-white/[0.08] text-gray-300">{plan.badge}</Badge>
+          <Badge className="border-[#b8ff65]/20 bg-[#b8ff65]/10 text-[#dfffaa]">{plan.badge}</Badge>
         )}
       </div>
 
       <div className="mt-6 sm:mt-8">
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-semibold tracking-normal text-white">{price}</span>
+          <span className="font-display text-5xl font-semibold tracking-normal text-white">{price}</span>
           <span className="text-sm text-gray-500">{caption}</span>
         </div>
       </div>
@@ -1738,7 +1781,7 @@ function PlanCard({
       <ul className="mt-6 space-y-3 sm:mt-8">
         {features.map((feature) => (
           <li key={feature} className="flex gap-3 text-sm text-gray-300">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-500" />
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-[#b8ff65]" />
             <span>{feature}</span>
           </li>
         ))}
@@ -1746,7 +1789,7 @@ function PlanCard({
 
       <Button
         className={`mt-auto h-10 w-full ${
-          highlighted ? "bg-white text-black hover:bg-gray-200" : "border border-white/10 bg-transparent text-gray-200 hover:bg-white/[0.06] hover:text-white"
+          highlighted ? "bg-[#b8ff65] text-black hover:bg-[#d9ff9b]" : "border border-white/10 bg-transparent text-gray-200 hover:border-[#b8ff65]/30 hover:bg-[#b8ff65]/10 hover:text-white"
         }`}
         variant={highlighted ? "default" : "outline"}
         disabled={disabled}
@@ -1798,7 +1841,7 @@ function BillingPanel({
         </Alert>
       )}
 
-      <Card className="border-white/10 bg-[#0d0d0d]">
+      <Card className="border-white/10 bg-[#090a09]/90 shadow-xl shadow-black/20">
         <CardHeader>
           <div>
             <CardTitle className="text-white">Plans</CardTitle>
@@ -1869,28 +1912,28 @@ function BillingPanel({
       </Card>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-5">
+        <div className="rounded-md border border-white/10 bg-[#090a09]/90 p-5">
           <p className="text-xs font-medium uppercase text-gray-500">Current plan</p>
-          <p className="mt-2 text-lg font-semibold text-white">{billingSummary.plan_name}</p>
+          <p className="mt-2 font-display text-2xl font-semibold text-white">{billingSummary.plan_name}</p>
           <p className="mt-1 text-sm capitalize text-gray-500">{getAccountStatus(billingSummary)}</p>
         </div>
-        <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-5">
+        <div className="rounded-md border border-white/10 bg-[#090a09]/90 p-5">
           <p className="text-xs font-medium uppercase text-gray-500">Credit balance</p>
-          <p className="mt-2 text-lg font-semibold text-white">{formatNumber(getCreditBalance(billingSummary))}</p>
+          <p className="mt-2 font-display text-2xl font-semibold text-[#b8ff65]">{formatNumber(getCreditBalance(billingSummary))}</p>
           <p className="mt-1 text-sm text-gray-500">
             {formatCurrency(prepaidBalance, billingSummary.currency)} balance value
           </p>
         </div>
-        <div className="rounded-lg border border-white/10 bg-[#0d0d0d] p-5">
+        <div className="rounded-md border border-white/10 bg-[#090a09]/90 p-5">
           <p className="text-xs font-medium uppercase text-gray-500">Next invoice</p>
-          <p className="mt-2 text-lg font-semibold text-white">
+          <p className="mt-2 font-display text-2xl font-semibold text-white">
             {formatCurrency(nextInvoice, billingSummary.currency)}
           </p>
           <p className="mt-1 text-sm text-gray-500">Usage charges after plan access</p>
         </div>
       </section>
 
-      <Card className="border-white/10 bg-[#0d0d0d]">
+      <Card className="border-white/10 bg-[#090a09]/90 shadow-xl shadow-black/20">
         <CardHeader>
           <CardTitle className="text-white">Payments</CardTitle>
           <CardDescription className="text-gray-400">Recent Razorpay payments and invoices.</CardDescription>
@@ -1906,7 +1949,7 @@ function BillingPanel({
               {invoices.map((invoice) => (
                 <div
                   key={invoice.id}
-                  className="grid gap-3 border-b border-white/10 bg-[#0a0a0a] p-4 last:border-b-0 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center"
+                  className="grid gap-3 border-b border-white/10 bg-[#050505] p-4 last:border-b-0 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center"
                 >
                   <div>
                     <p className="font-mono text-sm text-white">{invoice.id}</p>
