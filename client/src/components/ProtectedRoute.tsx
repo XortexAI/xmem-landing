@@ -8,6 +8,14 @@ interface ProtectedRouteProps {
   children?: React.ReactNode;
 }
 
+const getReturnUrl = (ssrFallbackLocation: string) => {
+  if (typeof window === "undefined") {
+    return ssrFallbackLocation;
+  }
+
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+};
+
 export function ProtectedRoute({ component: Component, children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
@@ -27,7 +35,7 @@ export function ProtectedRoute({ component: Component, children }: ProtectedRout
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     // Store the attempted URL for redirect after login
-    const returnUrl = encodeURIComponent(location);
+    const returnUrl = encodeURIComponent(getReturnUrl(location));
     window.location.href = `/login?returnUrl=${returnUrl}`;
     return null;
   }
@@ -56,7 +64,7 @@ export function RequireUsername({ component: Component, children }: ProtectedRou
   }
 
   if (!isAuthenticated) {
-    const returnUrl = encodeURIComponent(location);
+    const returnUrl = encodeURIComponent(getReturnUrl(location));
     window.location.href = `/login?returnUrl=${returnUrl}`;
     return null;
   }
