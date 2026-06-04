@@ -286,7 +286,7 @@ export default function ContextImporter() {
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Context Importer</h1>
           <p className="text-lg text-white/60 max-w-2xl mx-auto">
-            Convert long chat threads from ChatGPT, Claude, Gemini, and Antigravity into compressed, usable memories.
+            Convert long chat threads from ChatGPT, Claude, Claude Code, Gemini, Cursor, and Antigravity into compressed, usable memories.
           </p>
           {user?.username && (
             <p className="text-sm text-white/40 mt-3 font-mono">@{user.username}</p>
@@ -350,7 +350,9 @@ export default function ContextImporter() {
                             <p className="mb-2 text-sm text-white/60">
                               <span className="font-semibold text-primary">Click to upload</span> or drag and drop
                             </p>
-                            <p className="text-xs text-white/40">Supported: Cursor &amp; Antigravity transcript exports (.txt, .md, .json)</p>
+                            <p className="text-xs text-white/40">
+                              Supported: Cursor, Claude Code &amp; Antigravity transcript exports (.txt, .md, .json, .jsonl)
+                            </p>
                           </div>
                           <Input
                             id="file-upload"
